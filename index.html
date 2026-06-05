@@ -67,6 +67,17 @@
   .toggle button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
   footer{text-align:center;color:var(--mut);font-size:12px;padding:24px;letter-spacing:1px}
   .empty{text-align:center;color:var(--mut);padding:40px;font-style:italic}
+  .navbadge{background:var(--vlow);color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:800;margin-left:2px}
+  .sevtag{padding:2px 9px;border-radius:6px;font-size:11px;font-weight:800;text-transform:uppercase}
+  .sev-critical{background:var(--vlowbg);color:var(--vlow)} .sev-warn{background:var(--lowbg);color:var(--low)} .sev-info{background:#eef0fb;color:var(--indigo)}
+  .alertcard{display:flex;align-items:center;gap:14px;padding:13px 16px;border-bottom:1px solid var(--line)}
+  .alertcard .typ{font-weight:700;min-width:90px} .alertcard .msg{color:var(--mut);flex:1}
+  .abc{padding:2px 8px;border-radius:6px;font-weight:800;font-size:11px}
+  .abc.A{background:var(--vlowbg);color:var(--vlow)} .abc.B{background:var(--lowbg);color:var(--low)} .abc.C{background:var(--okbg);color:var(--ok)}
+  .bannerstack{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
+  .miniban{padding:11px 16px;border-radius:10px;font-weight:700;display:flex;align-items:center;gap:10px;font-size:13px}
+  .miniban.crit{background:var(--vlowbg);color:var(--vlow);border:1px solid #f3c2cd}
+  .miniban.warn{background:var(--lowbg);color:var(--low);border:1px solid #efe0b3}
   @media print{nav,.toolbar,.topbar,footer,.filters{display:none!important}.page{display:block!important}.c,.panel{break-inside:avoid}}
   @media(max-width:1100px){.cards{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}}
 </style>
@@ -80,6 +91,8 @@
   <div class="tab" data-p="outward">⬆ Outward</div>
   <div class="tab" data-p="prod">🏭 Production</div>
   <div class="tab" data-p="bom">🧱 BOM</div>
+  <div class="tab" data-p="analytics">📈 Analytics</div>
+  <div class="tab" data-p="alerts">🔔 Alerts <span class="navbadge" id="navAlertBadge" style="display:none">0</span></div>
   <div class="tab" data-p="reports">📊 Reports</div>
   <div class="spacer">
     <span><span class="live-dot" id="dot"></span><span id="statustext">Loading…</span></span>
@@ -91,6 +104,7 @@
   <section class="page on" id="dash">
     <div class="cards" id="kpiTop"></div>
     <div class="cards two" id="kpiMid"></div>
+    <div class="bannerstack" id="bannerStack"></div>
     <div class="banner" id="reorderBanner" style="display:none"></div>
     <div class="panel"><h3>REORDER NOW — items below minimum</h3>
       <div style="overflow:auto;max-height:430px">
@@ -143,6 +157,36 @@
     <p class="sub">Standard consumption per product. Fill a BOM tab in your sheet to power planned-vs-actual.</p>
     <div class="panel"><div class="empty">No BOM data yet. Add a BOM tab (product → item → qty per unit) to your sheet and it will appear here, enabling waste/efficiency analysis.</div></div>
   </section>
+  <section class="page" id="analytics">
+    <h1 class="title">Analytics — Cost & Consumption</h1>
+    <p class="sub">Where the money goes, and where to cut. A/B/C = high/medium/low value items.</p>
+    <div class="cards" id="abcCards"></div>
+    <div class="grid2">
+      <div class="panel"><h3>Pareto — top items driving spend (80/20)</h3><div class="chartbox"><canvas id="paretoChart"></canvas></div></div>
+      <div class="panel"><h3>ABC Value Split</h3><div class="chartbox"><canvas id="abcChart"></canvas></div></div>
+    </div>
+    <div class="panel"><h3>Plan vs Actual — biggest overconsumption (based on daily_plan)</h3>
+      <div style="overflow:auto;max-height:380px">
+        <table id="pvaTable"><thead><tr><th>Code</th><th>Description</th><th class="r">Planned</th><th class="r">Actual</th><th class="r">Over %</th></tr></thead><tbody></tbody></table>
+      </div></div>
+    <div class="panel"><h3>Slow Movers — cash frozen in stock (60+ days cover)</h3>
+      <div style="overflow:auto;max-height:380px">
+        <table id="slowTable"><thead><tr><th>Code</th><th>Description</th><th class="r">Days Cover</th><th class="r">Value Locked ₹</th></tr></thead><tbody></tbody></table>
+      </div></div>
+  </section>
+
+  <section class="page" id="alerts">
+    <h1 class="title">Alerts</h1>
+    <p class="sub" id="alertsSub">All active alerts, most urgent first.</p>
+    <div class="filters">
+      <div class="chip on" data-af="all">All <span class="b" id="aAll">0</span></div>
+      <div class="chip" data-af="critical">Critical <span class="b" id="aCrit">0</span></div>
+      <div class="chip" data-af="warn">Warning <span class="b" id="aWarn">0</span></div>
+      <div class="chip" data-af="info">Info <span class="b" id="aInfo">0</span></div>
+    </div>
+    <div class="panel" id="alertList"></div>
+  </section>
+
   <section class="page" id="reports">
     <h1 class="title">Reports</h1>
     <p class="sub">Generate, then use "Print / Save PDF" to keep a copy.</p>
@@ -159,35 +203,43 @@
   <footer>BUILT FOR SHREE PRESSING · LIVE DATA FROM GOOGLE SHEETS · VIEW-ONLY</footer>
 </main>
 <script>
-const API_URL = "https://script.google.com/macros/s/AKfycbytg3GUhyJDOVqeKUmDogh68jt1IUulrWHXs34lOkPMzQ5wD2vY8hs2afq-yFDev-pd/exec";   /* paste your Apps Script /exec URL here to go live */
-let RAW=null, mode="cost", itemFilter="all", timer=null, catChart,healthChart,weekChart;
+const API_URL = "https://script.google.com/macros/s/AKfycbyMYdL6NmUigGXFDdNyZepeL7Palkc5--XWTXNrQ0xYfQapHUcPJ95FtJ1e2QpntXXf/exec";   /* paste your Apps Script /exec URL here to go live */
+let RAW=null, mode="cost", itemFilter="all", alertFilter="all", timer=null, catChart,healthChart,weekChart,paretoChart,abcChart;
 const inr=n=>"₹"+Math.round(n||0).toLocaleString("en-IN");
 const cls=s=>(s||"").replace(/\s+/g,"");
 const fmt=n=>(Math.round(n*100)/100).toLocaleString("en-IN");
 const pal=["#5b5bd6","#c0264a","#f5a623","#0f9d58","#3aa0a0","#9b59b6","#e67e22","#2d8cf0"];
 
 function sample(){
-  const mk=(code,desc,cat,uom,opening,recv,issued,rate,min,max,series,dead)=>{
+  const mk=(code,desc,cat,uom,opening,recv,issued,rate,min,max,series,dead,plan)=>{
     const closing=opening+recv-issued, active=series.filter(x=>x>0).length;
     const avg=active?issued/active:0, dc=avg?closing/avg:null;
     const status=closing<=min?"VERY LOW":(closing<=min*1.5?"LOW":"OK");
+    const w=[0,0,0,0,0];[[0,6],[7,13],[14,20],[21,27],[28,30]].forEach((k,ki)=>{for(let d=k[0];d<=k[1];d++)w[ki]+=series[d]||0;});
+    const planned=plan>0?plan*active:0, over=planned>0?(issued-planned)/planned:null;
     return {code,desc,short:desc,category:cat,uom,opening,received:recv,issued,closing,rate,min,max,
+      daily_plan:plan||0,planned_month:planned,overuse_pct:over,lead_time:7,
       stock_value:closing*rate,consumed_value:issued*rate,avgday:avg,days_cover:dc,
-      status,trend:["stable","rising","falling"][code.length%3],dead:!!dead,series};};
-  const z=Array(31).fill(0);
+      status,trend:["stable","rising","falling"][code.length%3],dead:!!dead,
+      spike:w[3]>(w[2]||1)*1.5,stockout_risk:dc!=null&&dc<7&&avg>0,weeks:w,series};};
+  const z=Array(31).fill(0), run=(v,n)=>z.map((_,i)=>i<(n||28)?v:0);
   const items=[
-    mk("OIL-002","Oil - Hydrolic 68 Nos","Oils","LTR",100,0,81,260,100,300,z,false),
-    mk("OIL-008","Vibrochem SF (L)","Oils","LTR",60,0,50,300,100,250,z,false),
-    mk("PKG-001","5 Ply Box 525x110x390","Corrugated","NOS",300,0,300,12,100,500,z,false),
-    mk("PKG-007","Box Corrugated 5 Ply","Corrugated","NOS",820,0,500,11,500,1500,z.map((_,i)=>i<28?18:0),false),
-    mk("ADH-003","Cyano Adhesive","Adhesive","NOS",400,100,260,80,150,600,z.map((_,i)=>i<28?9:0),false),
-    mk("PPE-002","Hand Gloves","PPE","PAIR",900,0,280,30,200,1200,z.map((_,i)=>i<28?10:0),false),
-    mk("ABR-001","Flap Disc 4in","Abrasives","NOS",250,0,95,120,60,400,z.map((_,i)=>i<28?3:0),false),
-    mk("STN-004","A4 Paper Ream","Stationery","NOS",80,0,0,250,20,150,z,true)];
+    mk("OIL-002","Oil - Hydrolic 68 Nos","Oils","LTR",100,0,81,260,100,300,run(3),false,2.5),
+    mk("OIL-008","Vibrochem SF (L)","Oils","LTR",60,0,50,300,100,250,run(1.8),false,1.5),
+    mk("PKG-001","5 Ply Box 525x110x390","Corrugated","NOS",300,0,300,12,100,500,run(11),false,8),
+    mk("PKG-007","Box Corrugated 5 Ply","Corrugated","NOS",820,0,500,11,500,1500,run(18),false,18),
+    mk("ADH-003","Cyano Adhesive","Adhesive","NOS",400,100,260,80,150,600,run(9),false,7),
+    mk("PPE-002","Hand Gloves","PPE","PAIR",900,0,280,30,200,1200,run(10),false,12),
+    mk("ABR-001","Flap Disc 4in","Abrasives","NOS",250,0,95,120,60,400,run(3.4),false,3),
+    mk("STN-004","A4 Paper Ream","Stationery","NOS",80,0,0,250,20,150,z,true,0)];
+  // ABC
+  const bc=items.slice().sort((a,b)=>b.consumed_value-a.consumed_value);
+  const tot=bc.reduce((s,i)=>s+i.consumed_value,0);let cum=0;
+  bc.forEach(it=>{cum+=it.consumed_value;const p=tot>0?cum/tot:1;it.abc=p<=.8?"A":p<=.95?"B":"C";});
   const cat={};
   items.forEach(it=>{const c=it.category;if(!cat[c])cat[c]={category:c,qty:0,cost:0,items:0,weeks:[0,0,0,0,0],weeks_cost:[0,0,0,0,0]};
     cat[c].qty+=it.issued;cat[c].cost+=it.consumed_value;cat[c].items++;
-    [[0,6],[7,13],[14,20],[21,27],[28,30]].forEach((w,k)=>{let s=0;for(let d=w[0];d<=w[1];d++)s+=it.series[d]||0;cat[c].weeks[k]+=s;cat[c].weeks_cost[k]+=s*it.rate;});});
+    it.weeks.forEach((w,k)=>{cat[c].weeks[k]+=w;cat[c].weeks_cost[k]+=w*it.rate;});});
   const cats=Object.values(cat).sort((a,b)=>b.cost-a.cost);
   const vlow=items.filter(i=>i.status==="VERY LOW"),low=items.filter(i=>i.status==="LOW"),ok=items.filter(i=>i.status==="OK");
   return {updated:new Date().toISOString(),
@@ -196,7 +248,27 @@ function sample(){
       total_produced:1550,total_dispatched:1460,qty_issued:items.reduce((s,i)=>s+i.issued,0)},
     items,categories:cats,
     production:[{code:"PRD-1",name:"Hero Cup",total:900},{code:"PRD-2",name:"Flywheel Ring",total:650}],
-    reorder:vlow.concat(low).map(i=>({code:i.code,desc:i.desc,closing:i.closing,uom:i.uom,min:i.min,days_cover:i.days_cover,trend:i.trend,suggest:Math.max(0,i.max-i.closing)}))};
+    reorder:vlow.concat(low).map(i=>({code:i.code,desc:i.desc,closing:i.closing,uom:i.uom,min:i.min,days_cover:i.days_cover,trend:i.trend,suggest:Math.max(0,i.max-i.closing)})),
+    alerts:buildSampleAlerts(items),
+    analytics:buildSampleAnalytics(items)};
+}
+function buildSampleAlerts(items){const out=[];const r1=x=>Math.round(x*10)/10;
+  items.forEach(i=>{
+    if(i.status==="VERY LOW")out.push({sev:"critical",type:"Stock",code:i.code,desc:i.desc,msg:`Below minimum (${r1(i.closing)} ${i.uom} vs min ${i.min})`,value:i.stock_value});
+    else if(i.status==="LOW")out.push({sev:"warn",type:"Stock",code:i.code,desc:i.desc,msg:`Approaching minimum (${r1(i.closing)} ${i.uom})`,value:i.stock_value});
+    if(i.stockout_risk)out.push({sev:"critical",type:"Stockout",code:i.code,desc:i.desc,msg:`May run out in ${Math.round(i.days_cover)}d, lead time ${i.lead_time}d`,value:i.consumed_value});
+    if(i.overuse_pct!=null&&i.overuse_pct>0.15)out.push({sev:"warn",type:"Overuse",code:i.code,desc:i.desc,msg:`Used ${Math.round(i.overuse_pct*100)}% above plan`,value:i.consumed_value});
+    if(i.spike)out.push({sev:"warn",type:"Spike",code:i.code,desc:i.desc,msg:"Usage spiked this week vs prior",value:i.consumed_value});
+    if(i.dead&&i.closing>0)out.push({sev:"info",type:"Dead stock",code:i.code,desc:i.desc,msg:`Idle, ${r1(i.closing)} ${i.uom} sitting`,value:i.stock_value});});
+  const rk={critical:0,warn:1,info:2};out.sort((a,b)=>(rk[a.sev]-rk[b.sev])||(b.value-a.value));return out;}
+function buildSampleAnalytics(items){
+  const bc=items.filter(i=>i.consumed_value>0).sort((a,b)=>b.consumed_value-a.consumed_value);
+  const tot=bc.reduce((s,i)=>s+i.consumed_value,0);let cum=0;
+  const pareto=bc.slice(0,15).map(i=>{cum+=i.consumed_value;return {code:i.code,desc:i.desc,cost:i.consumed_value,cum_pct:tot>0?cum/tot:0,abc:i.abc};});
+  const ag=cl=>{const f=items.filter(i=>i.abc===cl);return {cls:cl,items:f.length,value:f.reduce((s,i)=>s+i.consumed_value,0)};};
+  const pva=items.filter(i=>i.planned_month>0).map(i=>({code:i.code,desc:i.desc,planned:i.planned_month,actual:i.issued,pct:i.overuse_pct,uom:i.uom})).sort((a,b)=>(b.pct||0)-(a.pct||0)).slice(0,15);
+  const slow=items.filter(i=>i.days_cover!=null&&i.days_cover>60&&i.closing>0).sort((a,b)=>b.stock_value-a.stock_value).slice(0,15).map(i=>({code:i.code,desc:i.desc,days_cover:Math.round(i.days_cover),value:i.stock_value}));
+  return {pareto,abc:[ag("A"),ag("B"),ag("C")],plan_vs_actual:pva,slow_movers:slow,dead_value:items.filter(i=>i.dead).reduce((s,i)=>s+i.stock_value,0)};
 }
 async function load(){
   setStatus("loading");
@@ -208,7 +280,7 @@ function setStatus(s){const d=document.getElementById("dot"),t=document.getEleme
   d.className="live-dot"+(s==="live"?" on":"");
   t.textContent=s==="live"?"Live":(s==="loading"?"Loading…":(s==="error"?"Offline — sample":"Sample data"));}
 function renderAll(){document.getElementById("updated").textContent=new Date(RAW.updated).toLocaleTimeString("en-IN");
-  renderDash();renderItems();renderInOut();renderProd();}
+  renderDash();renderItems();renderInOut();renderProd();renderAnalytics();renderAlerts();}
 function card(lab,big,note,kind,ic){return `<div class="c ${kind||''}"><div class="lab">${lab}</div><div class="big">${big}</div>${note?`<div class="note">${note}</div>`:""}<div class="ic">${ic||''}</div></div>`;}
 function renderDash(){
   const k=RAW.kpi;
@@ -221,6 +293,17 @@ function renderDash(){
     card("Total Produced",(k.total_produced||0).toLocaleString("en-IN")+" pcs","","indigo","🏭"),
     card("Total Dispatched",(k.total_dispatched||0).toLocaleString("en-IN")+" pcs","","indigo","📦")].join("");
   const ro=RAW.reorder||[],b=document.getElementById("reorderBanner");
+  // banner stack: top critical/warn alert types summarized
+  const al=RAW.alerts||[];
+  const crit=al.filter(a=>a.sev==="critical"),warn=al.filter(a=>a.sev==="warn");
+  const bs=document.getElementById("bannerStack");
+  const byType=t=>al.filter(a=>a.type===t).length;
+  let bans=[];
+  if(byType("Stockout"))bans.push(`<div class="miniban crit">⛔ ${byType("Stockout")} item(s) at stockout risk before next delivery</div>`);
+  if(byType("Overuse"))bans.push(`<div class="miniban warn">📈 ${byType("Overuse")} item(s) consumed above plan — possible waste</div>`);
+  if(byType("Spike"))bans.push(`<div class="miniban warn">⚡ ${byType("Spike")} item(s) with a usage spike this week</div>`);
+  if(byType("Dead stock"))bans.push(`<div class="miniban warn">🗄 ${byType("Dead stock")} item(s) idle — ${inr((RAW.analytics||{}).dead_value||0)} frozen</div>`);
+  bs.innerHTML=bans.join("");
   if(ro.length){b.style.display="flex";b.innerHTML=`⚠ REORDER NOW — ${ro.length} items below minimum level`;}else b.style.display="none";
   document.querySelector("#reorderTable tbody").innerHTML=ro.length?ro.map(r=>`<tr class="alertrow"><td class="code">${r.code}</td><td>${r.desc}</td><td class="r"><b>${fmt(r.closing)}</b> ${r.uom}</td><td class="r">${fmt(r.min)}</td><td class="r">${r.days_cover==null?"—":Math.round(r.days_cover)+" d"}</td><td class="trend">→ ${r.trend}</td></tr>`).join(""):`<tr><td colspan=6 class="empty">All stock above minimum ✓</td></tr>`;
   drawCat();drawHealth();drawWeek();
@@ -257,6 +340,58 @@ function renderInOut(){
 function renderProd(){const k=RAW.kpi;
   document.getElementById("prodKpi").innerHTML=[card("Total Produced",(k.total_produced||0).toLocaleString("en-IN")+" pcs","","indigo","🏭"),card("Total Dispatched",(k.total_dispatched||0).toLocaleString("en-IN")+" pcs","","indigo","📦")].join("");
   document.querySelector("#prodTable tbody").innerHTML=(RAW.production||[]).map(p=>`<tr><td class="code">${p.code||""}</td><td>${p.name}</td><td class="r">${fmt(p.total)}</td></tr>`).join("")||`<tr><td colspan=3 class="empty">No production recorded yet</td></tr>`;}
+function renderAnalytics(){
+  const a=RAW.analytics||{};
+  const abc=a.abc||[];
+  const tot=abc.reduce((s,x)=>s+x.value,0)||1;
+  document.getElementById("abcCards").innerHTML=abc.map(x=>{
+    const kind=x.cls==="A"?"red":x.cls==="B"?"amber":"green";
+    return card(`Class ${x.cls} — ${x.cls==="A"?"watch closely":x.cls==="B"?"moderate":"low priority"}`,
+      inr(x.value),`${x.items} items · ${Math.round(x.value/tot*100)}% of spend`,kind,x.cls);}).join("")
+    + card("Dead Stock Value",inr(a.dead_value||0),"frozen cash","indigo","🗄");
+  // Pareto
+  const p=a.pareto||[];
+  if(paretoChart)paretoChart.destroy();
+  paretoChart=new Chart(document.getElementById("paretoChart"),{
+    data:{labels:p.map(x=>x.code),datasets:[
+      {type:"bar",label:"Cost ₹",data:p.map(x=>x.cost),backgroundColor:"#5b5bd6",borderRadius:5,yAxisID:"y"},
+      {type:"line",label:"Cumulative %",data:p.map(x=>Math.round(x.cum_pct*100)),borderColor:"#c0264a",backgroundColor:"transparent",tension:.3,yAxisID:"y1",pointRadius:3}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{position:"bottom"}},
+      scales:{y:{position:"left",ticks:{callback:v=>"₹"+v}},y1:{position:"right",min:0,max:100,ticks:{callback:v=>v+"%"},grid:{drawOnChartArea:false}}}}});
+  // ABC doughnut
+  if(abcChart)abcChart.destroy();
+  abcChart=new Chart(document.getElementById("abcChart"),{type:"doughnut",
+    data:{labels:abc.map(x=>"Class "+x.cls),datasets:[{data:abc.map(x=>x.value),backgroundColor:["#c0264a","#f5a623","#0f9d58"],borderColor:"#fff",borderWidth:3}]},
+    options:{maintainAspectRatio:false,cutout:"58%",plugins:{legend:{position:"bottom"},tooltip:{callbacks:{label:c=>"Class "+abc[c.dataIndex].cls+": "+inr(c.parsed)}}}}});
+  // plan vs actual
+  document.querySelector("#pvaTable tbody").innerHTML=(a.plan_vs_actual||[]).length?(a.plan_vs_actual).map(r=>{
+    const over=r.pct!=null?Math.round(r.pct*100):null;
+    const col=over==null?"":over>0?'style="color:var(--vlow);font-weight:700"':'style="color:var(--ok)"';
+    return `<tr><td class="code">${r.code}</td><td>${r.desc}</td><td class="r">${fmt(r.planned)} ${r.uom}</td><td class="r">${fmt(r.actual)} ${r.uom}</td><td class="r" ${col}>${over==null?"—":(over>0?"+":"")+over+"%"}</td></tr>`;}).join(""):`<tr><td colspan=5 class="empty">Fill daily_plan in your sheet to see plan-vs-actual</td></tr>`;
+  // slow movers
+  document.querySelector("#slowTable tbody").innerHTML=(a.slow_movers||[]).length?(a.slow_movers).map(r=>`<tr><td class="code">${r.code}</td><td>${r.desc}</td><td class="r">${r.days_cover} d</td><td class="r">${inr(r.value)}</td></tr>`).join(""):`<tr><td colspan=4 class="empty">No slow movers 🎉</td></tr>`;
+}
+function renderAlerts(){
+  const al=RAW.alerts||[];
+  const crit=al.filter(a=>a.sev==="critical").length,warn=al.filter(a=>a.sev==="warn").length,info=al.filter(a=>a.sev==="info").length;
+  document.getElementById("aAll").textContent=al.length;document.getElementById("aCrit").textContent=crit;
+  document.getElementById("aWarn").textContent=warn;document.getElementById("aInfo").textContent=info;
+  document.getElementById("alertsSub").textContent=`${al.length} active alerts — ${crit} critical, ${warn} warnings`;
+  const nb=document.getElementById("navAlertBadge");
+  if(crit>0){nb.style.display="inline-block";nb.textContent=crit;}else nb.style.display="none";
+  drawAlerts();
+}
+function drawAlerts(){
+  const al=(RAW.alerts||[]).filter(a=>alertFilter==="all"||a.sev===alertFilter);
+  const box=document.getElementById("alertList");
+  box.innerHTML=al.length?al.map(a=>`<div class="alertcard">
+    <span class="sevtag sev-${a.sev}">${a.sev}</span>
+    <span class="typ">${a.type}</span>
+    <span class="code">${a.code}</span>
+    <span class="msg">${a.desc} — ${a.msg}</span>
+    <span style="color:var(--mut);font-weight:700">${inr(a.value)}</span></div>`).join(""):`<div class="empty">No alerts in this view ✓</div>`;
+}
+
 function report(type){const a=document.getElementById("reportArea");
   const head=cols=>"<thead><tr>"+cols.map(c=>`<th class="${c.r?'r':''}">${c.t}</th>`).join("")+"</tr></thead>";
   let html="",title="";
@@ -275,7 +410,8 @@ function downloadCSV(){const rows=[["code","description","uom","closing","min","
   const b=new Blob([csv],{type:"text/csv"}),u=URL.createObjectURL(b),a=document.createElement("a");
   a.href=u;a.download="shree_pressing_stock_"+new Date().toISOString().slice(0,10)+".csv";a.click();URL.revokeObjectURL(u);}
 document.querySelectorAll("nav .tab").forEach(t=>t.onclick=()=>{document.querySelectorAll("nav .tab").forEach(x=>x.classList.remove("on"));document.querySelectorAll(".page").forEach(x=>x.classList.remove("on"));t.classList.add("on");document.getElementById(t.dataset.p).classList.add("on");});
-document.querySelectorAll(".chip").forEach(c=>c.onclick=()=>{document.querySelectorAll(".chip").forEach(x=>x.classList.remove("on"));c.classList.add("on");itemFilter=c.dataset.f;drawItems();});
+document.querySelectorAll(".chip[data-f]").forEach(c=>c.onclick=()=>{document.querySelectorAll(".chip[data-f]").forEach(x=>x.classList.remove("on"));c.classList.add("on");itemFilter=c.dataset.f;drawItems();});
+document.querySelectorAll(".chip[data-af]").forEach(c=>c.onclick=()=>{document.querySelectorAll(".chip[data-af]").forEach(x=>x.classList.remove("on"));c.classList.add("on");alertFilter=c.dataset.af;drawAlerts();});
 document.getElementById("itemSearch").oninput=drawItems;
 document.getElementById("auto").onchange=e=>{if(e.target.checked)startAuto();else clearInterval(timer);};
 function startAuto(){clearInterval(timer);timer=setInterval(load,10000);}
