@@ -160,6 +160,17 @@
   <section class="page" id="analytics">
     <h1 class="title">Analytics — Cost & Consumption</h1>
     <p class="sub">Where the money goes, and where to cut. A/B/C = high/medium/low value items.</p>
+    <div class="filters" style="align-items:center">
+      <label style="font-weight:700;color:var(--mut)">Group by:</label>
+      <select id="groupBy" class="search" style="flex:0 0 200px;cursor:pointer">
+        <option value="category">Category</option>
+        <option value="type">Item Type</option>
+      </select>
+      <label style="font-weight:700;color:var(--mut);margin-left:14px">Focus on:</label>
+      <select id="focusSel" class="search" style="flex:0 0 240px;cursor:pointer">
+        <option value="__all">All (overview)</option>
+      </select>
+    </div>
     <div class="cards" id="abcCards"></div>
     <div class="grid2">
       <div class="panel"><h3>Pareto — top items driving spend (80/20)</h3><div class="chartbox"><canvas id="paretoChart"></canvas></div></div>
@@ -193,6 +204,8 @@
     <div class="toolbar">
       <button class="btn primary" onclick="report('reorder')">🛒 Reorder List</button>
       <button class="btn" onclick="report('category')">📦 Category Consumption & Cost</button>
+      <button class="btn" onclick="report('minmax')">📏 Min/Max Consumption</button>
+      <button class="btn" onclick="report('monthly')">📅 Monthly Consumption Dataset</button>
       <button class="btn" onclick="report('stock')">📋 Full Stock Status</button>
       <button class="btn" onclick="report('dead')">🗄 Dead Stock Review</button>
       <button class="btn" onclick="window.print()">🖨 Print / Save PDF</button>
@@ -203,7 +216,7 @@
   <footer>BUILT FOR SHREE PRESSING · LIVE DATA FROM GOOGLE SHEETS · VIEW-ONLY</footer>
 </main>
 <script>
-const API_URL = "https://script.google.com/macros/s/AKfycbyMYdL6NmUigGXFDdNyZepeL7Palkc5--XWTXNrQ0xYfQapHUcPJ95FtJ1e2QpntXXf/exec";   /* paste your Apps Script /exec URL here to go live */
+const API_URL = "https://script.google.com/macros/s/AKfycbzVqvsvDE1hsscpEJDjZJeWxIRQrjSubC1ac4CgKvuKkIhjIaJ56xKrsS_nAhGPMf4/exec";   /* paste your Apps Script /exec URL here to go live */
 let RAW=null, mode="cost", itemFilter="all", alertFilter="all", timer=null, catChart,healthChart,weekChart,paretoChart,abcChart;
 const inr=n=>"₹"+Math.round(n||0).toLocaleString("en-IN");
 const cls=s=>(s||"").replace(/\s+/g,"");
@@ -211,42 +224,44 @@ const fmt=n=>(Math.round(n*100)/100).toLocaleString("en-IN");
 const pal=["#5b5bd6","#c0264a","#f5a623","#0f9d58","#3aa0a0","#9b59b6","#e67e22","#2d8cf0"];
 
 function sample(){
-  const mk=(code,desc,cat,uom,opening,recv,issued,rate,min,max,series,dead,plan)=>{
+  const mk=(code,desc,cat,typ,uom,opening,recv,issued,rate,latest,min,max,series,dead,plan)=>{
     const closing=opening+recv-issued, active=series.filter(x=>x>0).length;
     const avg=active?issued/active:0, dc=avg?closing/avg:null;
     const status=closing<=min?"VERY LOW":(closing<=min*1.5?"LOW":"OK");
     const w=[0,0,0,0,0];[[0,6],[7,13],[14,20],[21,27],[28,30]].forEach((k,ki)=>{for(let d=k[0];d<=k[1];d++)w[ki]+=series[d]||0;});
     const planned=plan>0?plan*active:0, over=planned>0?(issued-planned)/planned:null;
-    return {code,desc,short:desc,category:cat,uom,opening,received:recv,issued,closing,rate,min,max,
+    const nz=series.filter(x=>x>0);
+    const maxd=nz.length?Math.max(...nz):0, mind=nz.length?Math.min(...nz):0;
+    const pdelta=rate>0&&latest>0?(latest-rate)/rate:null;
+    return {code,desc,short:desc,category:cat,type:typ,uom,opening,received:recv,issued,closing,
+      rate,latest_rate:latest,master_rate:rate,price_delta:pdelta,
       daily_plan:plan||0,planned_month:planned,overuse_pct:over,lead_time:7,
-      stock_value:closing*rate,consumed_value:issued*rate,avgday:avg,days_cover:dc,
+      stock_value:closing*rate,consumed_value:issued*rate,avgday:avg,max_day:maxd,min_day:mind,days_cover:dc,
       status,trend:["stable","rising","falling"][code.length%3],dead:!!dead,
       spike:w[3]>(w[2]||1)*1.5,stockout_risk:dc!=null&&dc<7&&avg>0,weeks:w,series};};
   const z=Array(31).fill(0), run=(v,n)=>z.map((_,i)=>i<(n||28)?v:0);
   const items=[
-    mk("OIL-002","Oil - Hydrolic 68 Nos","Oils","LTR",100,0,81,260,100,300,run(3),false,2.5),
-    mk("OIL-008","Vibrochem SF (L)","Oils","LTR",60,0,50,300,100,250,run(1.8),false,1.5),
-    mk("PKG-001","5 Ply Box 525x110x390","Corrugated","NOS",300,0,300,12,100,500,run(11),false,8),
-    mk("PKG-007","Box Corrugated 5 Ply","Corrugated","NOS",820,0,500,11,500,1500,run(18),false,18),
-    mk("ADH-003","Cyano Adhesive","Adhesive","NOS",400,100,260,80,150,600,run(9),false,7),
-    mk("PPE-002","Hand Gloves","PPE","PAIR",900,0,280,30,200,1200,run(10),false,12),
-    mk("ABR-001","Flap Disc 4in","Abrasives","NOS",250,0,95,120,60,400,run(3.4),false,3),
-    mk("STN-004","A4 Paper Ream","Stationery","NOS",80,0,0,250,20,150,z,true,0)];
-  // ABC
+    mk("OIL-002","Oil - Hydrolic 68 Nos","Oils","Lubricant","LTR",100,0,81,260,290,100,300,run(3),false,2.5),
+    mk("OIL-008","Vibrochem SF (L)","Oils","Lubricant","LTR",60,0,50,300,300,100,250,run(1.8),false,1.5),
+    mk("PKG-001","5 Ply Box 525x110x390","Corrugated","Packaging","NOS",300,0,300,12,14,100,500,run(11),false,8),
+    mk("PKG-007","Box Corrugated 5 Ply","Corrugated","Packaging","NOS",820,0,500,11,11,500,1500,run(18),false,18),
+    mk("ADH-003","Cyano Adhesive","Adhesive","Consumable","NOS",400,100,260,80,92,150,600,run(9),false,7),
+    mk("PPE-002","Hand Gloves","PPE","Safety","PAIR",900,0,280,30,30,200,1200,run(10),false,12),
+    mk("ABR-001","Flap Disc 4in","Abrasives","Consumable","NOS",250,0,95,120,120,60,400,run(3.4),false,3),
+    mk("STN-004","A4 Paper Ream","Stationery","Office","NOS",80,0,0,250,250,20,150,z,true,0)];
   const bc=items.slice().sort((a,b)=>b.consumed_value-a.consumed_value);
   const tot=bc.reduce((s,i)=>s+i.consumed_value,0);let cum=0;
   bc.forEach(it=>{cum+=it.consumed_value;const p=tot>0?cum/tot:1;it.abc=p<=.8?"A":p<=.95?"B":"C";});
-  const cat={};
-  items.forEach(it=>{const c=it.category;if(!cat[c])cat[c]={category:c,qty:0,cost:0,items:0,weeks:[0,0,0,0,0],weeks_cost:[0,0,0,0,0]};
-    cat[c].qty+=it.issued;cat[c].cost+=it.consumed_value;cat[c].items++;
-    it.weeks.forEach((w,k)=>{cat[c].weeks[k]+=w;cat[c].weeks_cost[k]+=w*it.rate;});});
-  const cats=Object.values(cat).sort((a,b)=>b.cost-a.cost);
+  const roll=(key)=>{const g={};items.forEach(it=>{const c=it[key]||"Uncategorised";if(!g[c])g[c]={category:c,qty:0,cost:0,items:0,weeks:[0,0,0,0,0],weeks_cost:[0,0,0,0,0]};
+    g[c].qty+=it.issued;g[c].cost+=it.consumed_value;g[c].items++;it.weeks.forEach((w,k)=>{g[c].weeks[k]+=w;g[c].weeks_cost[k]+=w*it.rate;});});
+    return Object.values(g).sort((a,b)=>b.cost-a.cost);};
+  const cats=roll("category"), types=roll("type");
   const vlow=items.filter(i=>i.status==="VERY LOW"),low=items.filter(i=>i.status==="LOW"),ok=items.filter(i=>i.status==="OK");
   return {updated:new Date().toISOString(),
     kpi:{items_tracked:175,stock_value:items.reduce((s,i)=>s+i.stock_value,0),consumed_value:items.reduce((s,i)=>s+i.consumed_value,0),
       below_min:vlow.length+low.length,very_low:vlow.length,low:low.length,ok:ok.length,dead_stock:1,
       total_produced:1550,total_dispatched:1460,qty_issued:items.reduce((s,i)=>s+i.issued,0)},
-    items,categories:cats,
+    items,categories:cats,types:types,
     production:[{code:"PRD-1",name:"Hero Cup",total:900},{code:"PRD-2",name:"Flywheel Ring",total:650}],
     reorder:vlow.concat(low).map(i=>({code:i.code,desc:i.desc,closing:i.closing,uom:i.uom,min:i.min,days_cover:i.days_cover,trend:i.trend,suggest:Math.max(0,i.max-i.closing)})),
     alerts:buildSampleAlerts(items),
@@ -340,8 +355,34 @@ function renderInOut(){
 function renderProd(){const k=RAW.kpi;
   document.getElementById("prodKpi").innerHTML=[card("Total Produced",(k.total_produced||0).toLocaleString("en-IN")+" pcs","","indigo","🏭"),card("Total Dispatched",(k.total_dispatched||0).toLocaleString("en-IN")+" pcs","","indigo","📦")].join("");
   document.querySelector("#prodTable tbody").innerHTML=(RAW.production||[]).map(p=>`<tr><td class="code">${p.code||""}</td><td>${p.name}</td><td class="r">${fmt(p.total)}</td></tr>`).join("")||`<tr><td colspan=3 class="empty">No production recorded yet</td></tr>`;}
+function populateFocus(){
+  const gb=document.getElementById("groupBy").value;
+  const groups=gb==="type"?(RAW.types||[]):(RAW.categories||[]);
+  const sel=document.getElementById("focusSel");
+  const cur=sel.value;
+  sel.innerHTML=`<option value="__all">All (overview)</option>`+groups.map(g=>`<option value="${g.category}">${g.category} — ${inr(g.cost)}</option>`).join("");
+  if([...sel.options].some(o=>o.value===cur)) sel.value=cur;
+}
+function analyticsItems(){
+  const gb=document.getElementById("groupBy").value;
+  const focus=document.getElementById("focusSel").value;
+  if(focus==="__all") return RAW.items;
+  return RAW.items.filter(it=>(gb==="type"?it.type:it.category)===focus);
+}
+function recomputeAnalytics(items){
+  // recompute pareto/abc/pva/slow for the given item subset (so focus filter works live)
+  const bc=items.filter(i=>i.consumed_value>0).sort((a,b)=>b.consumed_value-a.consumed_value);
+  const tot=bc.reduce((s,i)=>s+i.consumed_value,0);let cum=0;
+  const pareto=bc.slice(0,15).map(i=>{cum+=i.consumed_value;return {code:i.code,desc:i.desc,cost:i.consumed_value,cum_pct:tot>0?cum/tot:0,abc:i.abc};});
+  const ag=cl=>{const f=items.filter(i=>i.abc===cl);return {cls:cl,items:f.length,value:f.reduce((s,i)=>s+i.consumed_value,0)};};
+  const pva=items.filter(i=>i.planned_month>0).map(i=>({code:i.code,desc:i.desc,planned:i.planned_month,actual:i.issued,pct:i.overuse_pct,uom:i.uom})).sort((a,b)=>(b.pct||0)-(a.pct||0)).slice(0,15);
+  const slow=items.filter(i=>i.days_cover!=null&&i.days_cover>60&&i.closing>0).sort((a,b)=>b.stock_value-a.stock_value).slice(0,15).map(i=>({code:i.code,desc:i.desc,days_cover:Math.round(i.days_cover),value:i.stock_value}));
+  return {pareto,abc:[ag("A"),ag("B"),ag("C")],plan_vs_actual:pva,slow_movers:slow,dead_value:items.filter(i=>i.dead).reduce((s,i)=>s+i.stock_value,0)};
+}
 function renderAnalytics(){
-  const a=RAW.analytics||{};
+  populateFocus();
+  const items=analyticsItems();
+  const a=recomputeAnalytics(items);
   const abc=a.abc||[];
   const tot=abc.reduce((s,x)=>s+x.value,0)||1;
   document.getElementById("abcCards").innerHTML=abc.map(x=>{
@@ -349,7 +390,6 @@ function renderAnalytics(){
     return card(`Class ${x.cls} — ${x.cls==="A"?"watch closely":x.cls==="B"?"moderate":"low priority"}`,
       inr(x.value),`${x.items} items · ${Math.round(x.value/tot*100)}% of spend`,kind,x.cls);}).join("")
     + card("Dead Stock Value",inr(a.dead_value||0),"frozen cash","indigo","🗄");
-  // Pareto
   const p=a.pareto||[];
   if(paretoChart)paretoChart.destroy();
   paretoChart=new Chart(document.getElementById("paretoChart"),{
@@ -358,17 +398,14 @@ function renderAnalytics(){
       {type:"line",label:"Cumulative %",data:p.map(x=>Math.round(x.cum_pct*100)),borderColor:"#c0264a",backgroundColor:"transparent",tension:.3,yAxisID:"y1",pointRadius:3}]},
     options:{maintainAspectRatio:false,plugins:{legend:{position:"bottom"}},
       scales:{y:{position:"left",ticks:{callback:v=>"₹"+v}},y1:{position:"right",min:0,max:100,ticks:{callback:v=>v+"%"},grid:{drawOnChartArea:false}}}}});
-  // ABC doughnut
   if(abcChart)abcChart.destroy();
   abcChart=new Chart(document.getElementById("abcChart"),{type:"doughnut",
     data:{labels:abc.map(x=>"Class "+x.cls),datasets:[{data:abc.map(x=>x.value),backgroundColor:["#c0264a","#f5a623","#0f9d58"],borderColor:"#fff",borderWidth:3}]},
     options:{maintainAspectRatio:false,cutout:"58%",plugins:{legend:{position:"bottom"},tooltip:{callbacks:{label:c=>"Class "+abc[c.dataIndex].cls+": "+inr(c.parsed)}}}}});
-  // plan vs actual
   document.querySelector("#pvaTable tbody").innerHTML=(a.plan_vs_actual||[]).length?(a.plan_vs_actual).map(r=>{
     const over=r.pct!=null?Math.round(r.pct*100):null;
     const col=over==null?"":over>0?'style="color:var(--vlow);font-weight:700"':'style="color:var(--ok)"';
     return `<tr><td class="code">${r.code}</td><td>${r.desc}</td><td class="r">${fmt(r.planned)} ${r.uom}</td><td class="r">${fmt(r.actual)} ${r.uom}</td><td class="r" ${col}>${over==null?"—":(over>0?"+":"")+over+"%"}</td></tr>`;}).join(""):`<tr><td colspan=5 class="empty">Fill daily_plan in your sheet to see plan-vs-actual</td></tr>`;
-  // slow movers
   document.querySelector("#slowTable tbody").innerHTML=(a.slow_movers||[]).length?(a.slow_movers).map(r=>`<tr><td class="code">${r.code}</td><td>${r.desc}</td><td class="r">${r.days_cover} d</td><td class="r">${inr(r.value)}</td></tr>`).join(""):`<tr><td colspan=4 class="empty">No slow movers 🎉</td></tr>`;
 }
 function renderAlerts(){
@@ -403,6 +440,15 @@ function report(type){const a=document.getElementById("reportArea");
     html=`<table>${head([{t:"Code"},{t:"Description"},{t:"Closing",r:1},{t:"Min",r:1},{t:"Value ₹",r:1},{t:"Status"}])}<tbody>`+RAW.items.map(i=>`<tr><td class="code">${i.code}</td><td>${i.desc}</td><td class="r">${fmt(i.closing)} ${i.uom}</td><td class="r">${fmt(i.min)}</td><td class="r">${inr(i.stock_value)}</td><td><span class="pill ${cls(i.status)}">${i.status}</span></td></tr>`).join("")+`</tbody></table>`;}
   else if(type==="dead"){title="Dead Stock Review (no issues this month)";const d=RAW.items.filter(i=>i.dead);
     html=`<table>${head([{t:"Code"},{t:"Description"},{t:"Closing",r:1},{t:"Value locked ₹",r:1}])}<tbody>`+(d.length?d.map(i=>`<tr><td class="code">${i.code}</td><td>${i.desc}</td><td class="r">${fmt(i.closing)} ${i.uom}</td><td class="r">${inr(i.stock_value)}</td></tr>`).join(""):`<tr><td colspan=4 class="empty">No dead stock 🎉</td></tr>`)+`</tbody></table>`;}
+  else if(type==="minmax"){title="Min / Max Consumption per Item (this month)";
+    const rows=RAW.items.filter(i=>i.issued>0).sort((a,b)=>b.max_day-a.max_day);
+    html=`<table>${head([{t:"Code"},{t:"Description"},{t:"UOM"},{t:"Min/Day",r:1},{t:"Max/Day",r:1},{t:"Avg/Day",r:1},{t:"Month Total",r:1}])}<tbody>`+(rows.length?rows.map(i=>`<tr><td class="code">${i.code}</td><td>${i.desc}</td><td>${i.uom}</td><td class="r">${fmt(i.min_day)}</td><td class="r"><b>${fmt(i.max_day)}</b></td><td class="r">${fmt(i.avgday)}</td><td class="r">${fmt(i.issued)}</td></tr>`).join(""):`<tr><td colspan=7 class="empty">No consumption recorded yet</td></tr>`)+`</tbody></table>`;}
+  else if(type==="monthly"){title="Monthly Consumption Dataset — for month-over-month comparison";
+    const cats=RAW.categories||[];
+    const totQty=cats.reduce((s,c)=>s+c.qty,0),totCost=cats.reduce((s,c)=>s+c.cost,0);
+    html=`<p style="padding:0 4px;color:var(--mut)">Month: <b>${new Date().toLocaleDateString("en-IN",{month:"long",year:"numeric"})}</b> · Total Qty Issued: <b>${fmt(totQty)}</b> · Total Cost: <b>${inr(totCost)}</b></p>`;
+    html+=`<table>${head([{t:"Category"},{t:"Items",r:1},{t:"Qty Issued",r:1},{t:"Cost ₹",r:1},{t:"Wk1",r:1},{t:"Wk2",r:1},{t:"Wk3",r:1},{t:"Wk4",r:1},{t:"Wk5",r:1}])}<tbody>`+cats.map(c=>`<tr><td>${c.category}</td><td class="r">${c.items}</td><td class="r">${fmt(c.qty)}</td><td class="r">${inr(c.cost)}</td>${c.weeks.map(w=>`<td class="r">${fmt(w)}</td>`).join("")}</tr>`).join("")+`<tr style="font-weight:800;background:#f2f2f2"><td>TOTAL</td><td class="r">${cats.reduce((s,c)=>s+c.items,0)}</td><td class="r">${fmt(totQty)}</td><td class="r">${inr(totCost)}</td><td colspan=5></td></tr></tbody></table>`;
+    html+=`<p style="padding:8px 4px;color:var(--mut);font-size:12px">Tip: save this PDF each month and compare side by side to spot rising categories.</p>`;}
   a.innerHTML=`<h3>${title} — ${new Date().toLocaleDateString("en-IN")}</h3>`+html;}
 function downloadCSV(){const rows=[["code","description","uom","closing","min","avg_day","status","stock_value","consumed_value","category"]];
   RAW.items.forEach(i=>rows.push([i.code,i.desc,i.uom,i.closing,i.min,Math.round(i.avgday*100)/100,i.status,Math.round(i.stock_value),Math.round(i.consumed_value),i.category]));
@@ -412,6 +458,8 @@ function downloadCSV(){const rows=[["code","description","uom","closing","min","
 document.querySelectorAll("nav .tab").forEach(t=>t.onclick=()=>{document.querySelectorAll("nav .tab").forEach(x=>x.classList.remove("on"));document.querySelectorAll(".page").forEach(x=>x.classList.remove("on"));t.classList.add("on");document.getElementById(t.dataset.p).classList.add("on");});
 document.querySelectorAll(".chip[data-f]").forEach(c=>c.onclick=()=>{document.querySelectorAll(".chip[data-f]").forEach(x=>x.classList.remove("on"));c.classList.add("on");itemFilter=c.dataset.f;drawItems();});
 document.querySelectorAll(".chip[data-af]").forEach(c=>c.onclick=()=>{document.querySelectorAll(".chip[data-af]").forEach(x=>x.classList.remove("on"));c.classList.add("on");alertFilter=c.dataset.af;drawAlerts();});
+document.getElementById("groupBy").onchange=()=>{document.getElementById("focusSel").value="__all";renderAnalytics();};
+document.getElementById("focusSel").onchange=renderAnalytics;
 document.getElementById("itemSearch").oninput=drawItems;
 document.getElementById("auto").onchange=e=>{if(e.target.checked)startAuto();else clearInterval(timer);};
 function startAuto(){clearInterval(timer);timer=setInterval(load,10000);}
