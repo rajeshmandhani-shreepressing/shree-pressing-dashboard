@@ -83,6 +83,17 @@
 </style>
 </head>
 <body>
+<div id="loginScreen" style="position:fixed;inset:0;z-index:1000;background:linear-gradient(135deg,#1f2733,#0e1116);display:flex;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:18px;padding:38px 34px;width:340px;box-shadow:0 20px 60px rgba(0,0,0,.4)">
+    <div style="height:4px;background:linear-gradient(90deg,#f5a623,#f7c34a);border-radius:4px;margin:-38px -34px 24px;border-radius:18px 18px 0 0"></div>
+    <h2 style="font-size:20px;font-weight:800;color:#1a1f29;margin-bottom:4px">SHREE PRESSING</h2>
+    <p style="color:#7b8494;font-size:13px;margin-bottom:22px">Consumables Portal — sign in to continue</p>
+    <input id="loginUser" placeholder="Username" autocomplete="username" style="width:100%;padding:12px 14px;border:1px solid #e7eaef;border-radius:10px;font-size:14px;margin-bottom:12px">
+    <input id="loginPass" type="password" placeholder="Password" autocomplete="current-password" style="width:100%;padding:12px 14px;border:1px solid #e7eaef;border-radius:10px;font-size:14px;margin-bottom:16px">
+    <button id="loginBtn" style="width:100%;padding:12px;background:#5b5bd6;color:#fff;border:none;border-radius:10px;font-weight:700;font-size:15px;cursor:pointer">Sign in</button>
+    <p id="loginErr" style="color:#c0264a;font-size:13px;margin-top:12px;min-height:18px;text-align:center"></p>
+  </div>
+</div>
 <div class="topbar"></div>
 <nav>
   <div class="tab on" data-p="dash">📈 Dashboard</div>
@@ -98,6 +109,8 @@
     <span><span class="live-dot" id="dot"></span><span id="statustext">Loading…</span></span>
     <label style="cursor:pointer"><input type="checkbox" id="auto" checked> Auto-refresh 10s</label>
     <span id="updated"></span>
+    <span id="whoami" style="font-weight:700;color:var(--ink)"></span>
+    <button class="btn" id="logoutBtn" style="padding:6px 12px">Logout</button>
   </div>
 </nav>
 <main>
@@ -216,7 +229,8 @@
   <footer>BUILT FOR SHREE PRESSING · LIVE DATA FROM GOOGLE SHEETS · VIEW-ONLY</footer>
 </main>
 <script>
-const API_URL = "https://script.google.com/macros/s/AKfycbzVqvsvDE1hsscpEJDjZJeWxIRQrjSubC1ac4CgKvuKkIhjIaJ56xKrsS_nAhGPMf4/exec";   /* paste your Apps Script /exec URL here to go live */
+const API_URL = "";   /* paste your Apps Script /exec URL here to go live */
+let TOKEN = null;     // set after login (kept in memory only)
 let RAW=null, mode="cost", itemFilter="all", alertFilter="all", timer=null, catChart,healthChart,weekChart,paretoChart,abcChart;
 const inr=n=>"₹"+Math.round(n||0).toLocaleString("en-IN");
 const cls=s=>(s||"").replace(/\s+/g,"");
@@ -285,10 +299,49 @@ function buildSampleAnalytics(items){
   const slow=items.filter(i=>i.days_cover!=null&&i.days_cover>60&&i.closing>0).sort((a,b)=>b.stock_value-a.stock_value).slice(0,15).map(i=>({code:i.code,desc:i.desc,days_cover:Math.round(i.days_cover),value:i.stock_value}));
   return {pareto,abc:[ag("A"),ag("B"),ag("C")],plan_vs_actual:pva,slow_movers:slow,dead_value:items.filter(i=>i.dead).reduce((s,i)=>s+i.stock_value,0)};
 }
+async function doLogin(){
+  const u=document.getElementById("loginUser").value.trim();
+  const p=document.getElementById("loginPass").value;
+  const err=document.getElementById("loginErr");
+  err.textContent="";
+  if(!u||!p){ err.textContent="Enter username and password."; return; }
+  if(!API_URL){
+    if(u.toLowerCase()==="demo"&&p==="demo"){ TOKEN="demo"; afterLogin("demo (preview)"); }
+    else err.textContent="Preview mode: use demo / demo. Real logins work once API_URL is set.";
+    return;
+  }
+  document.getElementById("loginBtn").textContent="Signing in…";
+  try{
+    const r=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body:JSON.stringify({action:"login",user:u,pass:p})});
+    const d=await r.json();
+    if(d.ok&&d.token){ TOKEN=d.token; afterLogin(d.user); }
+    else err.textContent=d.error||"Login failed.";
+  }catch(e){ err.textContent="Could not reach server."; }
+  document.getElementById("loginBtn").textContent="Sign in";
+}
+function afterLogin(user){
+  document.getElementById("loginScreen").style.display="none";
+  document.getElementById("whoami").textContent="👤 "+user;
+  startAuto(); load();
+}
+function logout(){
+  TOKEN=null; clearInterval(timer);
+  document.getElementById("loginPass").value="";
+  document.getElementById("loginErr").textContent="";
+  document.getElementById("loginScreen").style.display="flex";
+}
 async function load(){
+  if(!TOKEN) return;
   setStatus("loading");
-  try{ if(API_URL){const r=await fetch(API_URL);RAW=await r.json();setStatus("live");} else {RAW=sample();setStatus("sample");} }
-  catch(e){ RAW=sample();setStatus("error"); }
+  try{
+    if(API_URL){
+      const r=await fetch(API_URL+"?token="+encodeURIComponent(TOKEN));
+      const d=await r.json();
+      if(d.auth===false){ logout(); return; }
+      RAW=d; setStatus("live");
+    } else { RAW=sample(); setStatus("sample"); }
+  }catch(e){ RAW=sample(); setStatus("error"); }
   renderAll();
 }
 function setStatus(s){const d=document.getElementById("dot"),t=document.getElementById("statustext");
@@ -463,7 +516,11 @@ document.getElementById("focusSel").onchange=renderAnalytics;
 document.getElementById("itemSearch").oninput=drawItems;
 document.getElementById("auto").onchange=e=>{if(e.target.checked)startAuto();else clearInterval(timer);};
 function startAuto(){clearInterval(timer);timer=setInterval(load,10000);}
-startAuto();load();
+document.getElementById("loginBtn").onclick=doLogin;
+document.getElementById("loginPass").addEventListener("keydown",e=>{if(e.key==="Enter")doLogin();});
+document.getElementById("loginUser").addEventListener("keydown",e=>{if(e.key==="Enter")document.getElementById("loginPass").focus();});
+document.getElementById("logoutBtn").onclick=logout;
+/* no auto-load — wait for login. Login screen is shown by default. */
 </script>
 </body>
 </html>
