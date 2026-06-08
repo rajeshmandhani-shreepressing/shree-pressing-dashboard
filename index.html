@@ -78,6 +78,12 @@
   .miniban{padding:11px 16px;border-radius:10px;font-weight:700;display:flex;align-items:center;gap:10px;font-size:13px}
   .miniban.crit{background:var(--vlowbg);color:var(--vlow);border:1px solid #f3c2cd}
   .miniban.warn{background:var(--lowbg);color:var(--low);border:1px solid #efe0b3}
+  #moveTable td,#moveTable th{padding:6px 7px;text-align:center;white-space:nowrap}
+  #moveTable td.lbl{text-align:left;position:sticky;left:0;background:var(--card);font-weight:600}
+  #moveTable th.lbl{text-align:left;position:sticky;left:0;background:var(--card);z-index:2}
+  .mvin{background:var(--okbg);color:var(--ok);font-weight:700;border-radius:4px}
+  .mvout{background:var(--vlowbg);color:var(--vlow);font-weight:700;border-radius:4px}
+  .mvrow-out td.lbl small{color:var(--vlow)} .mvrow-in td.lbl small{color:var(--ok)}
   @media print{nav,.toolbar,.topbar,footer,.filters{display:none!important}.page{display:block!important}.c,.panel{break-inside:avoid}}
   @media(max-width:1100px){.cards{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}}
 </style>
@@ -98,13 +104,13 @@
 <nav>
   <div class="tab on" data-p="dash">📈 Dashboard</div>
   <div class="tab" data-p="items">🧩 Items</div>
-  <div class="tab" data-p="inward">⬇ Inward</div>
-  <div class="tab" data-p="outward">⬆ Outward</div>
+  <div class="tab" data-p="movement">🔁 Movement</div>
   <div class="tab" data-p="prod">🏭 Production</div>
   <div class="tab" data-p="bom">🧱 BOM</div>
-  <div class="tab" data-p="analytics">📈 Analytics</div>
+  <div class="tab" data-p="analytics">📊 Analytics</div>
+  <div class="tab" data-p="trends">📅 Trends</div>
   <div class="tab" data-p="alerts">🔔 Alerts <span class="navbadge" id="navAlertBadge" style="display:none">0</span></div>
-  <div class="tab" data-p="reports">📊 Reports</div>
+  <div class="tab" data-p="reports">🗂 Reports</div>
   <div class="spacer">
     <span><span class="live-dot" id="dot"></span><span id="statustext">Loading…</span></span>
     <label style="cursor:pointer"><input type="checkbox" id="auto" checked> Auto-refresh 10s</label>
@@ -143,20 +149,27 @@
       <input class="search" id="itemSearch" placeholder="Search code, name, where used…">
     </div>
     <div class="panel"><div style="overflow:auto;max-height:600px">
-      <table id="itemsTable"><thead><tr><th>Code</th><th>Description</th><th>UOM</th><th class="r">Closing</th><th class="r">Min</th><th class="r">Avg/Day</th><th class="r">Days Cover</th><th>Status</th><th>Trend</th></tr></thead><tbody></tbody></table>
+      <table id="itemsTable"><thead><tr><th>Code</th><th>Description</th><th>UOM</th><th class="r">Received</th><th class="r">Issued</th><th class="r">Closing</th><th class="r">Min</th><th class="r">Avg/Day</th><th class="r">Days Cover</th><th>Status</th><th>Trend</th></tr></thead><tbody></tbody></table>
     </div></div>
   </section>
-  <section class="page" id="inward">
-    <h1 class="title">Inward — Material Received</h1><p class="sub">Month receipts per item</p>
-    <div class="panel"><div style="overflow:auto;max-height:600px">
-      <table id="inwardTable"><thead><tr><th>Code</th><th>Description</th><th class="r">Received (month)</th><th>UOM</th><th class="r">Value ₹</th></tr></thead><tbody></tbody></table>
+
+  <section class="page" id="movement">
+    <h1 class="title">Movement — Daily In / Out</h1>
+    <p class="sub">Day-by-day receipts (IN) and issues (OUT) per item for the month.</p>
+    <div class="filters">
+      <div class="chip on" data-mf="all">All <span class="b" id="mAll">0</span></div>
+      <div class="chip" data-mf="moved">Only items that moved <span class="b" id="mMoved">0</span></div>
+      <input class="search" id="moveSearch" placeholder="Search code or name…">
+      <select id="moveType" class="search" style="flex:0 0 160px;cursor:pointer">
+        <option value="both">IN &amp; OUT</option>
+        <option value="out">OUT only</option>
+        <option value="in">IN only</option>
+      </select>
+    </div>
+    <div class="panel"><div style="overflow:auto;max-height:620px">
+      <table id="moveTable" style="font-size:12px"><thead id="moveHead"></thead><tbody></tbody></table>
     </div></div>
-  </section>
-  <section class="page" id="outward">
-    <h1 class="title">Outward — Material Issued</h1><p class="sub">Month issues per item</p>
-    <div class="panel"><div style="overflow:auto;max-height:600px">
-      <table id="outwardTable"><thead><tr><th>Code</th><th>Description</th><th class="r">Issued (month)</th><th>UOM</th><th class="r">Avg/Day</th><th class="r">Consumed ₹</th></tr></thead><tbody></tbody></table>
-    </div></div>
+    <p class="sub" style="margin-top:10px;font-size:12px">Green = received that day · Red = issued that day · blank = no movement.</p>
   </section>
   <section class="page" id="prod">
     <h1 class="title">Production</h1><p class="sub">Parts produced this month</p>
@@ -199,6 +212,13 @@
       </div></div>
   </section>
 
+  <section class="page" id="trends">
+    <h1 class="title">Trends — Month over Month</h1>
+    <p class="sub">Proof of cost-cutting over time. Each month-end, a snapshot is saved and compared here.</p>
+    <div class="cards" id="trendCards"></div>
+    <div id="trendBody"></div>
+  </section>
+
   <section class="page" id="alerts">
     <h1 class="title">Alerts</h1>
     <p class="sub" id="alertsSub">All active alerts, most urgent first.</p>
@@ -229,9 +249,9 @@
   <footer>BUILT FOR SHREE PRESSING · LIVE DATA FROM GOOGLE SHEETS · VIEW-ONLY</footer>
 </main>
 <script>
-const API_URL = "https://script.google.com/macros/s/AKfycbxv4dGW2JAFby2yHNBBu1kVb2mTNCIlLc0d6UP6Uz5zxj27VZWDmhev-Fvvc5XIQ9zD/exec";   /* paste your Apps Script /exec URL here to go live */
+const API_URL = "https://script.google.com/macros/s/AKfycbx5b5Hj6eyDhQW4abdb8IhxwfJzndpeWAgVC9fqnsp6eYDZ0UG82YOO2_vYnIbIRjdU/exec";   /* paste your Apps Script /exec URL here to go live */
 let TOKEN = null;     // set after login (kept in memory only)
-let RAW=null, mode="cost", itemFilter="all", alertFilter="all", timer=null, catChart,healthChart,weekChart,paretoChart,abcChart;
+let RAW=null, mode="cost", itemFilter="all", alertFilter="all", timer=null, catChart,healthChart,weekChart,paretoChart,abcChart,trendCostChart,trendQtyChart;
 const inr=n=>"₹"+Math.round(n||0).toLocaleString("en-IN");
 const cls=s=>(s||"").replace(/\s+/g,"");
 const fmt=n=>(Math.round(n*100)/100).toLocaleString("en-IN");
@@ -247,12 +267,15 @@ function sample(){
     const nz=series.filter(x=>x>0);
     const maxd=nz.length?Math.max(...nz):0, mind=nz.length?Math.min(...nz):0;
     const pdelta=rate>0&&latest>0?(latest-rate)/rate:null;
+    // synthetic IN series: a couple of deliveries during the month for preview
+    const inSeries=Array(31).fill(0);
+    if(recv>0){ inSeries[3]=Math.round(recv*0.6); inSeries[17]=recv-inSeries[3]; }
     return {code,desc,short:desc,category:cat,type:typ,uom,opening,received:recv,issued,closing,
       rate,latest_rate:latest,master_rate:rate,price_delta:pdelta,
       daily_plan:plan||0,planned_month:planned,overuse_pct:over,lead_time:7,
       stock_value:closing*rate,consumed_value:issued*rate,avgday:avg,max_day:maxd,min_day:mind,days_cover:dc,
       status,trend:["stable","rising","falling"][code.length%3],dead:!!dead,
-      spike:w[3]>(w[2]||1)*1.5,stockout_risk:dc!=null&&dc<7&&avg>0,weeks:w,series};};
+      spike:w[3]>(w[2]||1)*1.5,stockout_risk:dc!=null&&dc<7&&avg>0,weeks:w,series,in_series:inSeries};};
   const z=Array(31).fill(0), run=(v,n)=>z.map((_,i)=>i<(n||28)?v:0);
   const items=[
     mk("OIL-002","Oil - Hydrolic 68 Nos","Oils","Lubricant","LTR",100,0,81,260,290,100,300,run(3),false,2.5),
@@ -279,7 +302,15 @@ function sample(){
     production:[{code:"PRD-1",name:"Hero Cup",total:900},{code:"PRD-2",name:"Flywheel Ring",total:650}],
     reorder:vlow.concat(low).map(i=>({code:i.code,desc:i.desc,closing:i.closing,uom:i.uom,min:i.min,days_cover:i.days_cover,trend:i.trend,suggest:Math.max(0,i.max-i.closing)})),
     alerts:buildSampleAlerts(items),
-    analytics:buildSampleAnalytics(items)};
+    analytics:buildSampleAnalytics(items),
+    trends:[
+      {month:"2026-01",label:"Jan 2026",consumption_qty:3120,consumption_cost:118400,stock_value:360000,dead_value:9000,categories:[]},
+      {month:"2026-02",label:"Feb 2026",consumption_qty:2980,consumption_cost:121200,stock_value:355000,dead_value:8600,categories:[]},
+      {month:"2026-03",label:"Mar 2026",consumption_qty:3240,consumption_cost:126800,stock_value:351000,dead_value:8200,categories:[]},
+      {month:"2026-04",label:"Apr 2026",consumption_qty:3010,consumption_cost:119500,stock_value:349000,dead_value:7800,categories:[]},
+      {month:"2026-05",label:"May 2026",consumption_qty:2870,consumption_cost:112300,stock_value:347000,dead_value:7400,categories:[]},
+      {month:"2026-06",label:"Jun 2026",consumption_qty:3005,consumption_cost:103900,stock_value:372000,dead_value:7000,categories:[]}
+    ]};
 }
 function buildSampleAlerts(items){const out=[];const r1=x=>Math.round(x*10)/10;
   items.forEach(i=>{
@@ -348,7 +379,7 @@ function setStatus(s){const d=document.getElementById("dot"),t=document.getEleme
   d.className="live-dot"+(s==="live"?" on":"");
   t.textContent=s==="live"?"Live":(s==="loading"?"Loading…":(s==="error"?"Offline — sample":"Sample data"));}
 function renderAll(){document.getElementById("updated").textContent=new Date(RAW.updated).toLocaleTimeString("en-IN");
-  renderDash();renderItems();renderInOut();renderProd();renderAnalytics();renderAlerts();}
+  renderDash();renderItems();renderProd();renderAnalytics();renderAlerts();renderTrends();renderMovement();}
 function card(lab,big,note,kind,ic){return `<div class="c ${kind||''}"><div class="lab">${lab}</div><div class="big">${big}</div>${note?`<div class="note">${note}</div>`:""}<div class="ic">${ic||''}</div></div>`;}
 function renderDash(){
   const k=RAW.kpi;
@@ -401,10 +432,84 @@ function renderItems(){const k=RAW.kpi;
 function drawItems(){const q=(document.getElementById("itemSearch").value||"").toLowerCase();
   let rows=RAW.items.filter(it=>{const f=itemFilter==="all"?true:itemFilter==="dead"?it.dead:it.status===itemFilter;
     const s=!q||(it.code+" "+it.desc+" "+(it.short||"")).toLowerCase().includes(q);return f&&s;});
-  document.querySelector("#itemsTable tbody").innerHTML=rows.length?rows.map(it=>`<tr><td class="code">${it.code}</td><td>${it.desc}</td><td>${it.uom||""}</td><td class="r">${fmt(it.closing)}</td><td class="r">${fmt(it.min)}</td><td class="r">${it.avgday?fmt(it.avgday):"—"}</td><td class="r">${it.days_cover==null?"—":Math.round(it.days_cover)+" d"}</td><td><span class="pill ${cls(it.status)}">${it.status}</span></td><td class="trend">→ ${it.trend}</td></tr>`).join(""):`<tr><td colspan=9 class="empty">No items match the filter/search</td></tr>`;}
-function renderInOut(){
-  document.querySelector("#inwardTable tbody").innerHTML=RAW.items.filter(i=>i.received>0).map(i=>`<tr><td class="code">${i.code}</td><td>${i.desc}</td><td class="r">${fmt(i.received)}</td><td>${i.uom}</td><td class="r">${inr(i.received*i.rate)}</td></tr>`).join("")||`<tr><td colspan=5 class="empty">No receipts recorded yet</td></tr>`;
-  document.querySelector("#outwardTable tbody").innerHTML=RAW.items.filter(i=>i.issued>0).map(i=>`<tr><td class="code">${i.code}</td><td>${i.desc}</td><td class="r">${fmt(i.issued)}</td><td>${i.uom}</td><td class="r">${i.avgday?fmt(i.avgday):"—"}</td><td class="r">${inr(i.consumed_value)}</td></tr>`).join("")||`<tr><td colspan=6 class="empty">No issues recorded yet</td></tr>`;}
+  document.querySelector("#itemsTable tbody").innerHTML=rows.length?rows.map(it=>`<tr><td class="code">${it.code}</td><td>${it.desc}</td><td>${it.uom||""}</td><td class="r">${fmt(it.received||0)}</td><td class="r">${fmt(it.issued||0)}</td><td class="r">${fmt(it.closing)}</td><td class="r">${fmt(it.min)}</td><td class="r">${it.avgday?fmt(it.avgday):"—"}</td><td class="r">${it.days_cover==null?"—":Math.round(it.days_cover)+" d"}</td><td><span class="pill ${cls(it.status)}">${it.status}</span></td><td class="trend">→ ${it.trend}</td></tr>`).join(""):`<tr><td colspan=11 class="empty">No items match the filter/search</td></tr>`;}
+let moveFilter="all";
+function renderMovement(){
+  document.getElementById("mAll").textContent=RAW.items.length;
+  document.getElementById("mMoved").textContent=RAW.items.filter(i=>(i.issued||0)>0||(i.received||0)>0).length;
+  // build day header (1..31)
+  let hd='<tr><th class="lbl">Item</th><th>UOM</th><th>Flow</th>';
+  for(let d=1;d<=31;d++) hd+=`<th>${d}</th>`;
+  hd+='<th class="r">Total</th></tr>';
+  document.getElementById("moveHead").innerHTML=hd;
+  drawMovement();
+}
+function drawMovement(){
+  const q=(document.getElementById("moveSearch").value||"").toLowerCase();
+  const typ=document.getElementById("moveType").value;
+  let rows=RAW.items.filter(it=>{
+    const moved=(it.issued||0)>0||(it.received||0)>0;
+    const f=moveFilter==="moved"?moved:true;
+    const s=!q||(it.code+" "+it.desc).toLowerCase().includes(q);
+    return f&&s;});
+  const body=rows.map(it=>{
+    const out=it.series||[], inn=it.in_series||[];
+    const hasOut=(it.issued||0)>0, hasIn=(it.received||0)>0;
+    let html="";
+    if(typ!=="in" && (hasOut||typ==="out")){
+      html+=`<tr class="mvrow-out"><td class="lbl">${it.code}<br><small>${it.desc}</small></td><td>${it.uom||""}</td><td class="mvout">OUT</td>`;
+      for(let d=0;d<31;d++){const v=out[d]||0;html+=`<td class="${v>0?'mvout':''}">${v>0?fmt(v):""}</td>`;}
+      html+=`<td class="r"><b>${fmt(it.issued||0)}</b></td></tr>`;
+    }
+    if(typ!=="out" && (hasIn||typ==="in")){
+      html+=`<tr class="mvrow-in"><td class="lbl">${typ==="both"?"":it.code+'<br><small>'+it.desc+'</small>'}</td><td>${typ==="both"?"":(it.uom||"")}</td><td class="mvin">IN</td>`;
+      for(let d=0;d<31;d++){const v=inn[d]||0;html+=`<td class="${v>0?'mvin':''}">${v>0?fmt(v):""}</td>`;}
+      html+=`<td class="r"><b>${fmt(it.received||0)}</b></td></tr>`;
+    }
+    return html;
+  }).join("");
+  document.querySelector("#moveTable tbody").innerHTML=body||`<tr><td colspan=35 class="empty">No movement matches the filter/search</td></tr>`;
+}
+function renderTrends(){
+  const t=RAW.trends||[];
+  const box=document.getElementById("trendBody");
+  if(t.length<1){ box.innerHTML=`<div class="empty">No monthly snapshots yet. At each month-end, run "Save snapshot" (button in your sheet / Apps Script) and months will appear here for comparison.</div>`;
+    if(trendCostChart){trendCostChart.destroy();trendCostChart=null;} if(trendQtyChart){trendQtyChart.destroy();trendQtyChart=null;}
+    document.getElementById("trendCards").innerHTML=""; return; }
+  const labels=t.map(s=>s.label||s.month);
+  const cost=t.map(s=>s.consumption_cost), qty=t.map(s=>s.consumption_qty);
+  // MoM delta cards (latest vs previous)
+  const n=t.length, last=t[n-1], prev=n>1?t[n-2]:null;
+  const delta=(cur,pr)=>pr&&pr!=0?Math.round((cur-pr)/pr*100):null;
+  const dCost=prev?delta(last.consumption_cost,prev.consumption_cost):null;
+  const dQty=prev?delta(last.consumption_qty,prev.consumption_qty):null;
+  const arrow=d=>d==null?"":d>0?`▲ ${d}%`:d<0?`▼ ${Math.abs(d)}%`:"– 0%";
+  const kind=d=>d==null?"":d>0?"red":"green"; // rising cost = bad
+  document.getElementById("trendCards").innerHTML=[
+    card("Latest Month Cost",inr(last.consumption_cost),arrow(dCost)+" vs prev",kind(dCost),"₹"),
+    card("Latest Month Qty",fmt(last.consumption_qty),arrow(dQty)+" vs prev",kind(dQty),"📦"),
+    card("Months Tracked",n,"history depth","indigo","📅"),
+    card("Avg Monthly Cost",inr(cost.reduce((a,b)=>a+b,0)/n),"across tracked months","","Σ")
+  ].join("");
+  box.innerHTML=`<div class="grid2">
+    <div class="panel"><h3>Consumption Cost — month over month</h3><div class="chartbox"><canvas id="trendCostChart"></canvas></div></div>
+    <div class="panel"><h3>Consumption Quantity — month over month</h3><div class="chartbox"><canvas id="trendQtyChart"></canvas></div></div>
+  </div>
+  <div class="panel"><h3>Monthly Snapshot Table</h3><div style="overflow:auto;max-height:340px">
+    <table><thead><tr><th>Month</th><th class="r">Consumption Qty</th><th class="r">Consumption Cost</th><th class="r">Stock Value</th><th class="r">Dead Value</th><th class="r">MoM Cost</th></tr></thead><tbody>${
+      t.map((s,i)=>{const pr=i>0?t[i-1]:null;const d=pr?delta(s.consumption_cost,pr.consumption_cost):null;
+        const c=d==null?"":d>0?'style="color:var(--vlow);font-weight:700"':'style="color:var(--ok)"';
+        return `<tr><td>${s.label||s.month}</td><td class="r">${fmt(s.consumption_qty)}</td><td class="r">${inr(s.consumption_cost)}</td><td class="r">${inr(s.stock_value)}</td><td class="r">${inr(s.dead_value)}</td><td class="r" ${c}>${d==null?"—":arrow(d)}</td></tr>`;}).join("")
+    }</tbody></table></div></div>`;
+  if(trendCostChart)trendCostChart.destroy();
+  trendCostChart=new Chart(document.getElementById("trendCostChart"),{type:"line",
+    data:{labels,datasets:[{label:"Cost ₹",data:cost,borderColor:"#5b5bd6",backgroundColor:"rgba(91,91,214,.08)",fill:true,tension:.3,pointRadius:4}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>"₹"+v}}}}});
+  if(trendQtyChart)trendQtyChart.destroy();
+  trendQtyChart=new Chart(document.getElementById("trendQtyChart"),{type:"bar",
+    data:{labels,datasets:[{label:"Qty",data:qty,backgroundColor:"#0f9d58",borderRadius:5}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{display:false}}}});
+}
 function renderProd(){const k=RAW.kpi;
   document.getElementById("prodKpi").innerHTML=[card("Total Produced",(k.total_produced||0).toLocaleString("en-IN")+" pcs","","indigo","🏭"),card("Total Dispatched",(k.total_dispatched||0).toLocaleString("en-IN")+" pcs","","indigo","📦")].join("");
   document.querySelector("#prodTable tbody").innerHTML=(RAW.production||[]).map(p=>`<tr><td class="code">${p.code||""}</td><td>${p.name}</td><td class="r">${fmt(p.total)}</td></tr>`).join("")||`<tr><td colspan=3 class="empty">No production recorded yet</td></tr>`;}
@@ -514,6 +619,9 @@ document.querySelectorAll(".chip[data-af]").forEach(c=>c.onclick=()=>{document.q
 document.getElementById("groupBy").onchange=()=>{document.getElementById("focusSel").value="__all";renderAnalytics();};
 document.getElementById("focusSel").onchange=renderAnalytics;
 document.getElementById("itemSearch").oninput=drawItems;
+document.querySelectorAll(".chip[data-mf]").forEach(c=>c.onclick=()=>{document.querySelectorAll(".chip[data-mf]").forEach(x=>x.classList.remove("on"));c.classList.add("on");moveFilter=c.dataset.mf;drawMovement();});
+document.getElementById("moveSearch").oninput=drawMovement;
+document.getElementById("moveType").onchange=drawMovement;
 document.getElementById("auto").onchange=e=>{if(e.target.checked)startAuto();else clearInterval(timer);};
 function startAuto(){clearInterval(timer);timer=setInterval(load,10000);}
 document.getElementById("loginBtn").onclick=doLogin;
