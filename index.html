@@ -5,9 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Shree Pressing — Consumables Dashboard</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#f6f7f9; --card:#ffffff; --ink:#1a1f29; --mut:#7b8494; --line:#e7eaef;
@@ -16,7 +13,7 @@
     --vlow:#c0264a; --vlowbg:#fdecef; --green:#0f9d58; --greenbg:#e8f7ee;
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{background:var(--bg);color:var(--ink);font-family:"Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:14px;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;letter-spacing:-0.01em}
+  body{background:var(--bg);color:var(--ink);font-family:"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:14px}
   .topbar{height:4px;background:linear-gradient(90deg,var(--accent),#f7c34a)}
   nav{background:var(--card);border-bottom:1px solid var(--line);padding:0 22px;display:flex;align-items:center;gap:4px;flex-wrap:wrap;position:sticky;top:0;z-index:20}
   nav .tab{padding:18px 16px;color:var(--mut);cursor:pointer;font-weight:600;border-bottom:2px solid transparent;display:flex;align-items:center;gap:7px;font-size:14px}
@@ -32,7 +29,7 @@
   .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:16px}
   .c{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px 22px;position:relative}
   .c .lab{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--mut);font-weight:700}
-  .c .big{font-size:34px;font-weight:700;margin-top:12px;font-family:"JetBrains Mono","Consolas",monospace;letter-spacing:-0.02em}
+  .c .big{font-size:34px;font-weight:800;margin-top:12px;font-family:"Consolas",monospace}
   .c .note{font-size:13px;margin-top:6px;color:var(--mut)}
   .c .ic{position:absolute;top:18px;right:18px;width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:18px}
   .c.green{background:var(--greenbg);border-color:#bfe6cd} .c.green .big{color:var(--green)} .c.green .ic{background:var(--green);color:#fff}
@@ -46,9 +43,9 @@
   table{width:100%;border-collapse:collapse;font-size:13px}
   th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line)}
   th{font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:var(--mut);font-weight:700}
-  td.r,th.r{text-align:right;font-variant-numeric:tabular-nums;font-family:"JetBrains Mono",monospace}
+  td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   tr.alertrow td{background:var(--vlowbg)}
-  .code{color:var(--vlow);font-weight:700;font-family:"JetBrains Mono",monospace}
+  .code{color:var(--vlow);font-weight:700;font-family:monospace}
   .pill{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:800}
   .pill.VERYLOW{background:var(--vlowbg);color:var(--vlow)} .pill.LOW{background:var(--lowbg);color:var(--low)} .pill.OK{background:var(--okbg);color:var(--ok)}
   .trend{color:var(--mut);font-size:12px}
@@ -183,8 +180,17 @@
   </section>
   <section class="page" id="bom">
     <h1 class="title">BOM — Bill of Materials</h1>
-    <p class="sub">Standard consumption per product. Fill a BOM tab in your sheet to power planned-vs-actual.</p>
-    <div class="panel"><div class="empty">No BOM data yet. Add a BOM tab (product → item → qty per unit) to your sheet and it will appear here, enabling waste/efficiency analysis.</div></div>
+    <p class="sub">Search a part to see every consumable it uses, the standard ratio, and live cost.</p>
+    <div class="filters">
+      <input class="search" id="bomSearch" placeholder="Search a part (e.g. Hero Cup), or a consumable, cell, department…">
+      <select id="bomView" class="search" style="flex:0 0 200px;cursor:pointer">
+        <option value="product">Group by Part</option>
+        <option value="item">Group by Consumable</option>
+        <option value="flat">Flat list</option>
+      </select>
+    </div>
+    <div class="cards" id="bomCards"></div>
+    <div class="panel" id="bomResult"></div>
   </section>
   <section class="page" id="analytics">
     <h1 class="title">Analytics — Cost & Consumption</h1>
@@ -252,7 +258,7 @@
   <footer>BUILT FOR SHREE PRESSING · LIVE DATA FROM GOOGLE SHEETS · VIEW-ONLY</footer>
 </main>
 <script>
-const API_URL = "https://script.google.com/macros/s/AKfycbyy-LJekPB99ZVzLSWdz9irpfIBC3Rc5yf9EPN61cMQZiGF2hYlMmxlBwiiI5S1zFsC/exec";   /* paste your Apps Script /exec URL here to go live */
+const API_URL = "https://script.google.com/macros/s/AKfycbyJnZq4VVYjwk2WlEd43hWnXtpuh1nS3WNpHPbINPSGEWVJTu7JYrx_wCRIBfrBEgE6/exec";   /* paste your Apps Script /exec URL here to go live */
 let TOKEN = null;     // set after login (kept in memory only)
 let RAW=null, mode="cost", itemFilter="all", alertFilter="all", timer=null, catChart,healthChart,weekChart,paretoChart,abcChart,trendCostChart,trendQtyChart;
 const inr=n=>"₹"+Math.round(n||0).toLocaleString("en-IN");
@@ -306,6 +312,14 @@ function sample(){
     reorder:vlow.concat(low).map(i=>({code:i.code,desc:i.desc,closing:i.closing,uom:i.uom,min:i.min,days_cover:i.days_cover,trend:i.trend,suggest:Math.max(0,i.max-i.closing)})),
     alerts:buildSampleAlerts(items),
     analytics:buildSampleAnalytics(items),
+    bom:[
+      {product:"Hero Cup",cell:"Krushna Chavan",dept:"Production",item:"Bajaj Rust Preventive Oil",code:"CN000102",qty:5,per:"3000 jobs",uom:"LTR",type:"fixed",notes:"",rate:18,month_issued:81,month_cost:1458},
+      {product:"Hero Cup",cell:"Nivrutti & Yogesh",dept:"Packing",item:"Hero Cup Box",code:"PKG-007",qty:204,per:"3060 jobs",uom:"NOS",type:"fixed",notes:"204 boxes -> 3060 job",rate:11,month_issued:500,month_cost:5500},
+      {product:"Hero Cup",cell:"Nivrutti & Yogesh",dept:"Packing",item:'8"x14" Panni',code:"",qty:1,per:"5 jobs",uom:"NOS",type:"fixed",notes:"612 panni",rate:null,month_issued:null,month_cost:null},
+      {product:"Star City",cell:"Krushna Chavan",dept:"Production",item:"Bajaj Rust Preventive Oil",code:"CN000102",qty:5,per:"3000 jobs",uom:"LTR",type:"fixed",notes:"",rate:18,month_issued:81,month_cost:1458},
+      {product:"535 Rewari Cup",cell:"Nivrutti & Yogesh",dept:"Packing",item:'8"x14" Panni',code:"",qty:1,per:"1 job",uom:"NOS",type:"scheduled",notes:"DEVELOP A PANNI FOR 535 CUP",rate:null,month_issued:null,month_cost:null},
+      {product:"ISG Cup",cell:"Nivrutti & Yogesh",dept:"Marking",item:"Blue Permanent Marker",code:"",qty:"",per:"as per usage",uom:"NOS",type:"as-per-usage",notes:"",rate:null,month_issued:null,month_cost:null}
+    ],
     trends:[
       {month:"2026-01",label:"Jan 2026",consumption_qty:3120,consumption_cost:118400,stock_value:360000,dead_value:9000,categories:[]},
       {month:"2026-02",label:"Feb 2026",consumption_qty:2980,consumption_cost:121200,stock_value:355000,dead_value:8600,categories:[]},
@@ -382,7 +396,7 @@ function setStatus(s){const d=document.getElementById("dot"),t=document.getEleme
   d.className="live-dot"+(s==="live"?" on":"");
   t.textContent=s==="live"?"Live":(s==="loading"?"Loading…":(s==="error"?"Offline — sample":"Sample data"));}
 function renderAll(){document.getElementById("updated").textContent=new Date(RAW.updated).toLocaleTimeString("en-IN");
-  renderDash();renderItems();renderProd();renderAnalytics();renderAlerts();renderTrends();renderMovement();}
+  renderDash();renderItems();renderProd();renderAnalytics();renderAlerts();renderTrends();renderMovement();renderBOM();}
 function card(lab,big,note,kind,ic){return `<div class="c ${kind||''}"><div class="lab">${lab}</div><div class="big">${big}</div>${note?`<div class="note">${note}</div>`:""}<div class="ic">${ic||''}</div></div>`;}
 function renderDash(){
   const k=RAW.kpi;
@@ -513,6 +527,66 @@ function renderTrends(){
     data:{labels,datasets:[{label:"Qty",data:qty,backgroundColor:"#0f9d58",borderRadius:5}]},
     options:{maintainAspectRatio:false,plugins:{legend:{display:false}}}});
 }
+function renderBOM(){
+  const b=RAW.bom||[];
+  const parts=new Set(), items=new Set();
+  b.forEach(r=>{if(r.product)parts.add(r.product);if(r.item)items.add(r.item);});
+  document.getElementById("bomCards").innerHTML=[
+    card("BOM Rows",b.length,"","","🧱"),
+    card("Distinct Parts",parts.size,"","indigo","🔩"),
+    card("Distinct Consumables",items.size,"","indigo","📦"),
+    card("Coded (cost-linked)",b.filter(r=>r.code).length+" / "+b.length,"have item_code","",b.filter(r=>r.code).length===b.length?"green":"")
+  ].join("");
+  drawBOM();
+}
+function drawBOM(){
+  const b=RAW.bom||[];
+  if(!b.length){ document.getElementById("bomResult").innerHTML=`<div class="empty">No BOM data yet. Fill the BOM tab in your sheet (one row per part per consumable).</div>`; return; }
+  const q=(document.getElementById("bomSearch").value||"").toLowerCase();
+  const view=document.getElementById("bomView").value;
+  let rows=b.filter(r=>!q||(r.product+" "+r.item+" "+r.cell+" "+r.dept+" "+r.code).toLowerCase().includes(q));
+  if(!rows.length){ document.getElementById("bomResult").innerHTML=`<div class="empty">Nothing matches "${q}".</div>`; return; }
+
+  const ratio=r=>`${r.qty!==""&&r.qty!=null?fmt(r.qty):""} ${r.uom||""} per ${r.per||"—"}`.trim();
+  const costCell=r=>r.rate!=null?`₹${fmt(r.rate)}/${r.uom||"unit"}`:`<span style="color:var(--mut)">link code</span>`;
+  const typePill=t=>{const c=t==="fixed"?"OK":t==="scheduled"?"LOW":"VERYLOW";return `<span class="pill ${c}" style="font-size:10px">${t||"—"}</span>`;};
+
+  if(view==="flat"){
+    document.getElementById("bomResult").innerHTML=tableBOM(rows);
+    return;
+  }
+  // grouped view
+  const keyf=view==="item"?(r=>r.item):(r=>r.product);
+  const groups={};
+  rows.forEach(r=>{const k=keyf(r)||"—";(groups[k]=groups[k]||[]).push(r);});
+  const html=Object.keys(groups).sort().map(k=>{
+    const g=groups[k];
+    const linked=g.filter(r=>r.rate!=null);
+    const monthCost=linked.reduce((s,r)=>s+(r.month_cost||0),0);
+    const sub=view==="item"
+      ? `${g.length} part(s) use this · ${linked.length?inr(monthCost)+" issued this month":"add item_code for cost"}`
+      : `${g.length} consumable(s) · ${linked.length?inr(monthCost)+" consumed this month":"add item_code for cost"}`;
+    return `<div style="padding:14px 16px;border-bottom:1px solid var(--line)">
+      <div style="font-weight:800;font-size:15px;color:var(--ink)">${k}</div>
+      <div style="color:var(--mut);font-size:12px;margin-bottom:8px">${sub}</div>
+      ${tableBOM(g,view)}
+    </div>`;
+  }).join("");
+  document.getElementById("bomResult").innerHTML=html;
+
+  function tableBOM(list,v){
+    const col1=v==="item"?"Part":"Consumable";
+    const c1=r=>v==="item"?r.product:r.item;
+    return `<table style="font-size:12px"><thead><tr>
+      <th>${col1}</th><th>Cell / Supervisor</th><th>Dept</th><th>Standard Ratio</th><th>Type</th><th class="r">Rate</th><th class="r">Issued (mo)</th><th>Notes</th>
+      </tr></thead><tbody>${list.map(r=>`<tr>
+        <td><b>${c1(r)||"—"}</b></td><td>${r.cell||""}</td><td>${r.dept||""}</td>
+        <td>${ratio(r)}</td><td>${typePill(r.type)}</td>
+        <td class="r">${costCell(r)}</td>
+        <td class="r">${r.month_issued!=null?fmt(r.month_issued)+" "+(r.uom||""):"—"}</td>
+        <td style="color:var(--mut)">${r.notes||""}</td></tr>`).join("")}</tbody></table>`;
+  }
+}
 function renderProd(){const k=RAW.kpi;
   document.getElementById("prodKpi").innerHTML=[card("Total Produced",(k.total_produced||0).toLocaleString("en-IN")+" pcs","","indigo","🏭"),card("Total Dispatched",(k.total_dispatched||0).toLocaleString("en-IN")+" pcs","","indigo","📦")].join("");
   document.querySelector("#prodTable tbody").innerHTML=(RAW.production||[]).map(p=>`<tr><td class="code">${p.code||""}</td><td>${p.name}</td><td class="r">${fmt(p.total)}</td></tr>`).join("")||`<tr><td colspan=3 class="empty">No production recorded yet</td></tr>`;}
@@ -625,6 +699,8 @@ document.getElementById("itemSearch").oninput=drawItems;
 document.querySelectorAll(".chip[data-mf]").forEach(c=>c.onclick=()=>{document.querySelectorAll(".chip[data-mf]").forEach(x=>x.classList.remove("on"));c.classList.add("on");moveFilter=c.dataset.mf;drawMovement();});
 document.getElementById("moveSearch").oninput=drawMovement;
 document.getElementById("moveType").onchange=drawMovement;
+document.getElementById("bomSearch").oninput=drawBOM;
+document.getElementById("bomView").onchange=drawBOM;
 document.getElementById("auto").onchange=e=>{if(e.target.checked)startAuto();else clearInterval(timer);};
 function startAuto(){clearInterval(timer);timer=setInterval(load,10000);}
 document.getElementById("loginBtn").onclick=doLogin;
