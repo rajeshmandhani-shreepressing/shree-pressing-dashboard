@@ -108,6 +108,7 @@
   <div class="tab" data-p="prod">🏭 Production</div>
   <div class="tab" data-p="bom">🧱 BOM</div>
   <div class="tab" data-p="analytics">📊 Analytics</div>
+  <div class="tab" data-p="ai">🤖 AI Report</div>
   <div class="tab" data-p="trends">📅 Trends</div>
   <div class="tab" data-p="alerts">🔔 Alerts <span class="navbadge" id="navAlertBadge" style="display:none">0</span></div>
   <div class="tab" data-p="reports">🗂 Reports</div>
@@ -221,6 +222,33 @@
       </div></div>
   </section>
 
+  <section class="page" id="ai">
+    <h1 class="title">AI Report Generator</h1>
+    <p class="sub">Ask anything about your consumables in plain English. The AI reads your live sheet data right now and writes a report.</p>
+    <div class="panel" style="padding:16px">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+        <button class="btn" onclick="askAI('Show full costing of all materials used in Clutch Plate 102 — quantities, where used, cost, and any anomalies.')">Clutch Plate costing</button>
+        <button class="btn" onclick="askAI('Which 10 consumables cost us the most this month, and where is the waste? Give specific cost-cutting actions.')">Top cost & waste</button>
+        <button class="btn" onclick="askAI('Compare planned vs actual consumption. Which items are we overusing versus their daily_plan, and what is the rupee impact?')">Overuse analysis</button>
+        <button class="btn" onclick="askAI('Which items are about to run out given lead time? Give me a prioritized purchase order with quantities.')">Reorder plan</button>
+        <button class="btn" onclick="askAI('Analyse month-over-month trends. Is our consumption cost rising or falling, and which categories are driving it?')">Trend analysis</button>
+      </div>
+      <textarea id="aiQ" placeholder="e.g. Show me costing of all materials used in Hero Cup, where each is used, and which cell consumes most..." style="width:100%;min-height:80px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;font-size:14px;font-family:inherit;resize:vertical"></textarea>
+      <div style="display:flex;gap:10px;margin-top:10px;align-items:center">
+        <button class="btn primary" id="aiGo" onclick="askAI()">🤖 Generate Report</button>
+        <button class="btn" onclick="document.getElementById('aiOut').innerHTML='';document.getElementById('aiQ').value=''">Clear</button>
+        <span id="aiStatus" style="color:var(--mut);font-size:13px"></span>
+      </div>
+    </div>
+    <div class="panel" id="aiOutPanel" style="display:none">
+      <div style="padding:8px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center">
+        <h3 style="border:none;padding:0;margin:0">Report</h3>
+        <button class="btn" onclick="window.print()" style="padding:5px 12px">🖨 Print / Save PDF</button>
+      </div>
+      <div id="aiOut" style="padding:18px 22px;line-height:1.6;font-size:14px"></div>
+    </div>
+  </section>
+
   <section class="page" id="trends">
     <h1 class="title">Trends — Month over Month</h1>
     <p class="sub">Proof of cost-cutting over time. Each month-end, a snapshot is saved and compared here.</p>
@@ -258,7 +286,7 @@
   <footer>BUILT FOR SHREE PRESSING · LIVE DATA FROM GOOGLE SHEETS · VIEW-ONLY</footer>
 </main>
 <script>
-const API_URL = "https://script.google.com/macros/s/AKfycbw4ylM_pbX1B8y-2iaMGSjb8d4ryt5x9_c6qRelIFX-r-cxFPT4ZMLaGAjl1-pnbyMQ/exec";   /* paste your Apps Script /exec URL here to go live */
+const API_URL = "https://script.google.com/macros/s/AKfycbyxHNzpkqaYYnomav24DIhxcP82967YjWuUgg_D7arao4U4r09ZATypGze0KuHm3Vtq/exec";   /* paste your Apps Script /exec URL here to go live */
 let TOKEN = null;     // set after login (kept in memory only)
 let RAW=null, mode="cost", itemFilter="all", alertFilter="all", timer=null, catChart,healthChart,weekChart,paretoChart,abcChart,trendCostChart,trendQtyChart;
 const inr=n=>"₹"+Math.round(n||0).toLocaleString("en-IN");
@@ -587,6 +615,87 @@ function drawBOM(){
         <td style="color:var(--mut)">${r.notes||""}</td></tr>`).join("")}</tbody></table>`;
   }
 }
+
+/* ============ AI REPORT GENERATOR ============
+   Sends a COMPACT snapshot of the live data + the user's question to the
+   Claude API. Reads RAW (which is refreshed from the sheet every load), so
+   whatever you've filled in the sheet is what the AI sees — no code changes. */
+function buildAIContext(){
+  // Trim to essentials so we stay within token limits even with 175 items.
+  const items=(RAW.items||[]).map(i=>({
+    code:i.code,name:i.desc,cat:i.category,type:i.type,uom:i.uom,
+    closing:Math.round(i.closing),issued:i.issued,rate:i.rate?Math.round(i.rate*100)/100:null,
+    consumed_cost:Math.round(i.consumed_value),stock_value:Math.round(i.stock_value),
+    min:i.min,status:i.status,avgday:Math.round(i.avgday*100)/100,
+    days_cover:i.days_cover==null?null:Math.round(i.days_cover),
+    daily_plan:i.daily_plan,overuse_pct:i.overuse_pct==null?null:Math.round(i.overuse_pct*100),
+    lead_time:i.lead_time,dead:i.dead,trend:i.trend
+  }));
+  const bom=(RAW.bom||[]).map(b=>({
+    product:b.product,item:b.item,cell:b.cell,dept:b.dept,code:b.code,
+    qty:b.qty,per:b.per,uom:b.uom,type:b.type,rate:b.rate?Math.round(b.rate*100)/100:null,notes:b.notes
+  }));
+  return {
+    month_kpi:RAW.kpi,
+    items:items,
+    categories:(RAW.categories||[]).map(c=>({category:c.category,qty:Math.round(c.qty),cost:Math.round(c.cost),items:c.items})),
+    production:RAW.production||[],
+    bom:bom,
+    trends:(RAW.trends||[]).map(t=>({month:t.label,qty:t.consumption_qty,cost:t.consumption_cost})),
+    reorder:RAW.reorder||[]
+  };
+}
+
+async function askAI(presetQ){
+  const qBox=document.getElementById("aiQ");
+  if(presetQ){ qBox.value=presetQ; }
+  const question=(qBox.value||"").trim();
+  if(!question){ qBox.focus(); return; }
+  const out=document.getElementById("aiOut");
+  const panel=document.getElementById("aiOutPanel");
+  const status=document.getElementById("aiStatus");
+  const btn=document.getElementById("aiGo");
+  panel.style.display="block";
+  out.innerHTML=`<div class="empty">🤖 Reading your live sheet data and writing the report…</div>`;
+  status.textContent="Working…"; btn.disabled=true;
+
+  const ctx=buildAIContext();
+  const sys=`You are a senior manufacturing cost analyst for Shree Pressing, a metal-pressing factory. You are given the company's LIVE consumables inventory data as JSON.
+
+DATA DICTIONARY:
+- items[]: each consumable. code, name, category, uom, closing(stock now), issued(this month qty), rate(weighted-avg ₹/unit), consumed_cost(₹ this month), stock_value(₹), min(reorder level), status(VERY LOW/LOW/OK), avgday(avg issued per active day), days_cover(days of stock left), daily_plan(planned issue/day), overuse_pct(% issued above plan), lead_time(days), dead(no issues this month), trend.
+- bom[]: standard consumption recipe. product(finished part), item(consumable), cell(supervisor), dept, qty + per (e.g. qty 1 per "5 jobs"), type(fixed/scheduled/as-per-usage), rate, notes. ONE ROW PER PART PER CONSUMABLE.
+- categories[]: rollups. production[]: parts produced. trends[]: month-over-month consumption qty & cost. reorder[]: items below min with suggested order qty.
+
+RULES:
+- Use ONLY the numbers in the data. If something needed (e.g. a rate or BOM code) is missing/blank/null, SAY SO plainly ("rate not yet filled for X") rather than guessing. Never invent numbers.
+- When asked about a finished part (e.g. "Clutch Plate 102"), find all bom[] rows where product matches, list every consumable, its ratio, cost where rate exists, and which cell/dept uses it.
+- Give concrete, rupee-quantified, actionable findings aimed at CUTTING COST. Prioritise by money.
+- Be concise and structured. Use short headings and bullet points. This will be read by a busy factory owner.
+- Output clean HTML (use <h3>, <ul>, <li>, <b>, <table> with simple borders). No markdown, no code fences.`;
+
+  try{
+    const resp=await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        model:"claude-sonnet-4-20250514",
+        max_tokens:1500,
+        system:sys,
+        messages:[{role:"user",content:"LIVE DATA (JSON):\n"+JSON.stringify(ctx)+"\n\nQUESTION:\n"+question}]
+      })
+    });
+    const data=await resp.json();
+    let text=(data.content||[]).map(b=>b.type==="text"?b.text:"").join("\n").trim();
+    text=text.replace(/```html|```/g,"").trim();
+    if(!text) text="<p>No response generated. Try rephrasing the question.</p>";
+    out.innerHTML=`<div style="color:var(--mut);font-size:12px;margin-bottom:10px">Q: ${question}</div>`+text;
+    status.textContent="Done";
+  }catch(e){
+    out.innerHTML=`<div class="empty">Could not reach the AI service. ${API_URL?"":"(Note: AI works on the live deployed dashboard, not in local preview.)"}</div>`;
+    status.textContent="Error";
+  }
+  btn.disabled=false;
+}
 function renderProd(){const k=RAW.kpi;
   document.getElementById("prodKpi").innerHTML=[card("Total Produced",(k.total_produced||0).toLocaleString("en-IN")+" pcs","","indigo","🏭"),card("Total Dispatched",(k.total_dispatched||0).toLocaleString("en-IN")+" pcs","","indigo","📦")].join("");
   document.querySelector("#prodTable tbody").innerHTML=(RAW.production||[]).map(p=>`<tr><td class="code">${p.code||""}</td><td>${p.name}</td><td class="r">${fmt(p.total)}</td></tr>`).join("")||`<tr><td colspan=3 class="empty">No production recorded yet</td></tr>`;}
@@ -700,6 +809,7 @@ document.querySelectorAll(".chip[data-mf]").forEach(c=>c.onclick=()=>{document.q
 document.getElementById("moveSearch").oninput=drawMovement;
 document.getElementById("moveType").onchange=drawMovement;
 document.getElementById("bomSearch").oninput=drawBOM;
+document.getElementById("aiQ").addEventListener("keydown",e=>{if((e.ctrlKey||e.metaKey)&&e.key==="Enter")askAI();});
 document.getElementById("bomView").onchange=drawBOM;
 document.getElementById("auto").onchange=e=>{if(e.target.checked)startAuto();else clearInterval(timer);};
 function startAuto(){clearInterval(timer);timer=setInterval(load,10000);}
