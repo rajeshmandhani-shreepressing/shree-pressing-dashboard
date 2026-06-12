@@ -107,6 +107,7 @@
   <div class="tab" data-p="movement">🔁 Movement</div>
   <div class="tab" data-p="prod">🏭 Production</div>
   <div class="tab" data-p="bom">🧱 BOM</div>
+  <div class="tab" data-p="mfg">⚙️ Cost/Part</div>
   <div class="tab" data-p="analytics">📊 Analytics</div>
   <div class="tab" data-p="ai" style="display:none">🤖 AI Report</div>
   <div class="tab" data-p="trends">📅 Trends</div>
@@ -150,7 +151,7 @@
       <input class="search" id="itemSearch" placeholder="Search code, name, where used…">
     </div>
     <div class="panel"><div style="overflow:auto;max-height:600px">
-      <table id="itemsTable"><thead><tr><th>Code</th><th>Description</th><th>UOM</th><th class="r">Received</th><th class="r">Issued</th><th class="r">Closing</th><th class="r">Min</th><th class="r">Avg/Day</th><th class="r">Days Cover</th><th>Status</th><th>Trend</th></tr></thead><tbody></tbody></table>
+      <table id="itemsTable"><thead><tr><th>Code</th><th>Description</th><th>UOM</th><th class="r">Rate ₹</th><th class="r">Received</th><th class="r">Issued</th><th class="r">Closing</th><th class="r">Stock Value ₹</th><th class="r">Min</th><th class="r">Avg/Day</th><th class="r">Days Cover</th><th>Status</th><th>Trend</th></tr></thead><tbody></tbody></table>
     </div></div>
   </section>
 
@@ -193,6 +194,22 @@
     <div class="cards" id="bomCards"></div>
     <div class="panel" id="bomResult"></div>
   </section>
+
+  <section class="page" id="mfg">
+    <h1 class="title">Cost per Part & Consumption Efficiency</h1>
+    <p class="sub">Standard consumable cost per finished part, from BOM ratios × parts produced × rate. The metric a serious manufacturer lives on.</p>
+    <div class="cards" id="mfgCards"></div>
+    <div class="panel"><h3>Cost per Part — by product (highest first)</h3>
+      <div style="overflow:auto;max-height:440px">
+        <table id="mfgTable"><thead><tr><th>Product</th><th class="r">Parts Made</th><th class="r">Std Consumable Cost</th><th class="r">Cost / Part</th><th class="r">Costed Lines</th></tr></thead><tbody></tbody></table>
+      </div></div>
+    <div class="panel"><h3>Price Variance — vendor rate drift (from RATE LOG)</h3>
+      <div style="overflow:auto;max-height:300px">
+        <table id="pvTable"><thead><tr><th>Item Code</th><th class="r">First Rate</th><th class="r">Latest Rate</th><th class="r">Change</th><th class="r">Deliveries</th></tr></thead><tbody></tbody></table>
+      </div></div>
+    <p class="sub" style="font-size:12px">Note: "Std cost" is the planned/standard cost (BOM × output). Items marked as-per-usage or without a linked code/rate are excluded from the per-part figure and shown as uncosted in BOM. Fill production numbers + rates for full accuracy.</p>
+  </section>
+
   <section class="page" id="analytics">
     <h1 class="title">Analytics — Cost & Consumption</h1>
     <p class="sub">Where the money goes, and where to cut. A/B/C = high/medium/low value items.</p>
@@ -272,6 +289,7 @@
     <h1 class="title">Reports</h1>
     <p class="sub">Generate, then use "Print / Save PDF" to keep a copy.</p>
     <div class="toolbar">
+      <button class="btn primary" onclick="report('prevmonth')">📑 Previous Month Report (Director)</button>
       <button class="btn primary" onclick="report('reorder')">🛒 Reorder List</button>
       <button class="btn" onclick="report('category')">📦 Category Consumption & Cost</button>
       <button class="btn" onclick="report('minmax')">📏 Min/Max Consumption</button>
@@ -286,7 +304,7 @@
   <footer>BUILT FOR SHREE PRESSING · LIVE DATA FROM GOOGLE SHEETS · VIEW-ONLY</footer>
 </main>
 <script>
-const API_URL = "https://script.google.com/macros/s/AKfycbwJ5QR3z_0pu0aJmabTDmdZtzll8A8iqOur8mhYE9cpi9eenY2YhxWI3pWp1JYzp-9N/exec";   /* paste your Apps Script /exec URL here to go live */
+const API_URL = "https://script.google.com/macros/s/AKfycbwXuUf1lXNEhg3vS5G0lCCmbpjwKATUuCSmasRq_Jk5ACa1GgDT-LnrXVwkYutvrYiJ/exec";   /* paste your Apps Script /exec URL here to go live */
 let TOKEN = null;     // set after login (kept in memory only)
 let RAW=null, mode="cost", itemFilter="all", alertFilter="all", timer=null, catChart,healthChart,weekChart,paretoChart,abcChart,trendCostChart,trendQtyChart;
 const inr=n=>"₹"+Math.round(n||0).toLocaleString("en-IN");
@@ -354,8 +372,22 @@ function sample(){
       {month:"2026-03",label:"Mar 2026",consumption_qty:3240,consumption_cost:126800,stock_value:351000,dead_value:8200,categories:[]},
       {month:"2026-04",label:"Apr 2026",consumption_qty:3010,consumption_cost:119500,stock_value:349000,dead_value:7800,categories:[]},
       {month:"2026-05",label:"May 2026",consumption_qty:2870,consumption_cost:112300,stock_value:347000,dead_value:7400,categories:[]},
-      {month:"2026-06",label:"Jun 2026",consumption_qty:3005,consumption_cost:103900,stock_value:372000,dead_value:7000,categories:[]}
-    ]};
+      {month:"2026-06",label:"Jun 2026",consumption_qty:3005,consumption_cost:103900,stock_value:372000,dead_value:7000,categories:[{c:"Corrugated",q:1300,$:15600},{c:"Oils Lubricants",q:160,$:40000},{c:"Adhesive",q:420,$:18900},{c:"PPE",q:280,$:8400}]}
+    ],
+    manufacturing:[
+      {product:"Hero Cup",made:3060,std_cost:8200,cost_per_part:2.68,costable:2,total_lines:4,lines:[]},
+      {product:"Star City",made:3000,std_cost:6400,cost_per_part:2.13,costable:1,total_lines:3,lines:[]},
+      {product:"Clutch Plate 102",made:1338,std_cost:3100,cost_per_part:2.32,costable:2,total_lines:3,lines:[]},
+      {product:"Yamaha Bkt",made:5000,std_cost:1200,cost_per_part:0.24,costable:3,total_lines:4,lines:[]}
+    ],
+    price_variance:[
+      {code:"CN000102",first:240,last:268,change_pct:0.1167,n:3},
+      {code:"PKG-000019",first:11,last:12,change_pct:0.0909,n:4},
+      {code:"CON-000047",first:300,last:288,change_pct:-0.04,n:2}
+    ],
+    prev_month:{month:"2026-05",label:"May 2026",consumption_qty:2870,consumption_cost:112300,stock_value:347000,dead_value:7400,
+      categories:[{c:"Oils Lubricants",q:155,$:41200},{c:"Adhesive",q:410,$:18100},{c:"Corrugated",q:1280,$:15400},{c:"PPE",q:270,$:8000},{c:"Abrasives",q:90,$:10800}]}
+    };
 }
 function buildSampleAlerts(items){const out=[];const r1=x=>Math.round(x*10)/10;
   items.forEach(i=>{
@@ -424,7 +456,7 @@ function setStatus(s){const d=document.getElementById("dot"),t=document.getEleme
   d.className="live-dot"+(s==="live"?" on":"");
   t.textContent=s==="live"?"Live":(s==="loading"?"Loading…":(s==="error"?"Offline — sample":"Sample data"));}
 function renderAll(){document.getElementById("updated").textContent=new Date(RAW.updated).toLocaleTimeString("en-IN");
-  renderDash();renderItems();renderProd();renderAnalytics();renderAlerts();renderTrends();renderMovement();renderBOM();}
+  renderDash();renderItems();renderProd();renderAnalytics();renderAlerts();renderTrends();renderMovement();renderBOM();renderMfg();}
 function card(lab,big,note,kind,ic){return `<div class="c ${kind||''}"><div class="lab">${lab}</div><div class="big">${big}</div>${note?`<div class="note">${note}</div>`:""}<div class="ic">${ic||''}</div></div>`;}
 function renderDash(){
   const k=RAW.kpi;
@@ -477,7 +509,7 @@ function renderItems(){const k=RAW.kpi;
 function drawItems(){const q=(document.getElementById("itemSearch").value||"").toLowerCase();
   let rows=RAW.items.filter(it=>{const f=itemFilter==="all"?true:itemFilter==="dead"?it.dead:it.status===itemFilter;
     const s=!q||(it.code+" "+it.desc+" "+(it.short||"")).toLowerCase().includes(q);return f&&s;});
-  document.querySelector("#itemsTable tbody").innerHTML=rows.length?rows.map(it=>`<tr><td class="code">${it.code}</td><td>${it.desc}</td><td>${it.uom||""}</td><td class="r">${fmt(it.received||0)}</td><td class="r">${fmt(it.issued||0)}</td><td class="r">${fmt(it.closing)}</td><td class="r">${fmt(it.min)}</td><td class="r">${it.avgday?fmt(it.avgday):"—"}</td><td class="r">${it.days_cover==null?"—":Math.round(it.days_cover)+" d"}</td><td><span class="pill ${cls(it.status)}">${it.status}</span></td><td class="trend">→ ${it.trend}</td></tr>`).join(""):`<tr><td colspan=11 class="empty">No items match the filter/search</td></tr>`;}
+  document.querySelector("#itemsTable tbody").innerHTML=rows.length?rows.map(it=>`<tr><td class="code">${it.code}</td><td>${it.desc}</td><td>${it.uom||""}</td><td class="r">${it.rate?inr(it.rate):"—"}</td><td class="r">${fmt(it.received||0)}</td><td class="r">${fmt(it.issued||0)}</td><td class="r">${fmt(it.closing)}</td><td class="r">${it.stock_value?inr(it.stock_value):"—"}</td><td class="r">${fmt(it.min)}</td><td class="r">${it.avgday?fmt(it.avgday):"—"}</td><td class="r">${it.days_cover==null?"—":Math.round(it.days_cover)+" d"}</td><td><span class="pill ${cls(it.status)}">${it.status}</span></td><td class="trend">→ ${it.trend}</td></tr>`).join(""):`<tr><td colspan=13 class="empty">No items match the filter/search</td></tr>`;}
 let moveFilter="all";
 function renderMovement(){
   document.getElementById("mAll").textContent=RAW.items.length;
@@ -591,12 +623,19 @@ function drawBOM(){
     const g=groups[k];
     const linked=g.filter(r=>r.rate!=null);
     const monthCost=linked.reduce((s,r)=>s+(r.month_cost||0),0);
-    const sub=view==="item"
-      ? `${g.length} part(s) use this · ${linked.length?inr(monthCost)+" issued this month":"add item_code for cost"}`
-      : `${g.length} consumable(s) · ${linked.length?inr(monthCost)+" consumed this month":"add item_code for cost"}`;
+    const monthQty=g.reduce((s,r)=>s+(r.month_issued||0),0);
+    const codedN=linked.length, uncodedN=g.length-codedN;
+    // totals strip
+    const totals=`<div style="display:flex;gap:18px;flex-wrap:wrap;background:#eef0fb;border:1px solid #d4d8f4;border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:13px">
+      <span><b>${g.length}</b> ${view==="item"?"part(s)":"consumable(s)"}</span>
+      <span>Total issued this month: <b>${fmt(monthQty)}</b></span>
+      <span>Total cost this month: <b style="color:var(--indigo)">${inr(monthCost)}</b></span>
+      ${uncodedN?`<span style="color:var(--vlow)">${uncodedN} not yet costed (link code/rate)</span>`:`<span style="color:var(--ok)">all costed ✓</span>`}
+    </div>`;
     return `<div style="padding:14px 16px;border-bottom:1px solid var(--line)">
       <div style="font-weight:800;font-size:15px;color:var(--ink)">${k}</div>
-      <div style="color:var(--mut);font-size:12px;margin-bottom:8px">${sub}</div>
+      <div style="color:var(--mut);font-size:12px;margin-bottom:8px">${view==="item"?"Consumable used across these parts":"All consumables for this part"}</div>
+      ${totals}
       ${tableBOM(g,view)}
     </div>`;
   }).join("");
@@ -605,14 +644,19 @@ function drawBOM(){
   function tableBOM(list,v){
     const col1=v==="item"?"Part":"Consumable";
     const c1=r=>v==="item"?r.product:r.item;
+    const totQty=list.reduce((s,r)=>s+(r.month_issued||0),0);
+    const totCost=list.reduce((s,r)=>s+(r.month_cost||0),0);
     return `<table style="font-size:12px"><thead><tr>
-      <th>${col1}</th><th>Cell / Supervisor</th><th>Dept</th><th>Standard Ratio</th><th>Type</th><th class="r">Rate</th><th class="r">Issued (mo)</th><th>Notes</th>
+      <th>${col1}</th><th>Cell / Supervisor</th><th>Dept</th><th>Standard Ratio</th><th>Type</th><th class="r">Rate</th><th class="r">Issued (mo)</th><th class="r">Cost (mo)</th><th>Notes</th>
       </tr></thead><tbody>${list.map(r=>`<tr>
         <td><b>${c1(r)||"—"}</b></td><td>${r.cell||""}</td><td>${r.dept||""}</td>
         <td>${ratio(r)}</td><td>${typePill(r.type)}</td>
         <td class="r">${costCell(r)}</td>
         <td class="r">${r.month_issued!=null?fmt(r.month_issued)+" "+(r.uom||""):"—"}</td>
-        <td style="color:var(--mut)">${r.notes||""}</td></tr>`).join("")}</tbody></table>`;
+        <td class="r">${r.month_cost!=null?inr(r.month_cost):"—"}</td>
+        <td style="color:var(--mut)">${r.notes||""}</td></tr>`).join("")}
+        <tr style="font-weight:800;background:#f2f2f2"><td colspan=6>TOTAL</td><td class="r">${fmt(totQty)}</td><td class="r">${inr(totCost)}</td><td></td></tr>
+        </tbody></table>`;
   }
 }
 
@@ -696,6 +740,33 @@ RULES:
   }
   btn.disabled=false;
 }
+function renderMfg(){
+  const m=RAW.manufacturing||[];
+  const pv=RAW.price_variance||[];
+  // KPI cards
+  const totStd=m.reduce((s,p)=>s+(p.std_cost||0),0);
+  const withCpp=m.filter(p=>p.cost_per_part!=null);
+  const avgCpp=withCpp.length?withCpp.reduce((s,p)=>s+p.cost_per_part,0)/withCpp.length:0;
+  const priciest=withCpp.slice().sort((a,b)=>b.cost_per_part-a.cost_per_part)[0];
+  document.getElementById("mfgCards").innerHTML=[
+    card("Products Costed",withCpp.length+" / "+m.length,"need production + rates","","⚙️"),
+    card("Total Std Consumable Cost",inr(totStd),"this month's output","indigo","₹"),
+    card("Avg Cost / Part",withCpp.length?("₹"+(Math.round(avgCpp*100)/100)):"—","across costed products","green","÷"),
+    card("Priciest Part",priciest?priciest.product:"—",priciest?("₹"+(Math.round(priciest.cost_per_part*100)/100)+"/part"):"add data","amber","▲")
+  ].join("");
+  document.querySelector("#mfgTable tbody").innerHTML = m.length? m.map(p=>`<tr>
+    <td><b>${p.product}</b></td>
+    <td class="r">${p.made!=null?fmt(p.made):'<span style="color:var(--vlow)">no production</span>'}</td>
+    <td class="r">${p.std_cost?inr(p.std_cost):"—"}</td>
+    <td class="r">${p.cost_per_part!=null?"<b>₹"+(Math.round(p.cost_per_part*100)/100)+"</b>":"—"}</td>
+    <td class="r">${p.costable}/${p.total_lines}</td></tr>`).join("")
+    : `<tr><td colspan=5 class="empty">No BOM/production data yet. Fill BOM ratios, link item codes, and enter production.</td></tr>`;
+  document.querySelector("#pvTable tbody").innerHTML = pv.length? pv.map(v=>{
+    const up=v.change_pct>0; const col=up?'style="color:var(--vlow);font-weight:700"':'style="color:var(--ok);font-weight:700"';
+    return `<tr><td class="code">${v.code}</td><td class="r">₹${fmt(v.first)}</td><td class="r">₹${fmt(v.last)}</td>
+      <td class="r" ${col}>${up?"▲ ":"▼ "}${Math.abs(Math.round(v.change_pct*100))}%</td><td class="r">${v.n}</td></tr>`;}).join("")
+    : `<tr><td colspan=5 class="empty">Need 2+ dated entries per item in RATE LOG to show price drift.</td></tr>`;
+}
 function renderProd(){const k=RAW.kpi;
   document.getElementById("prodKpi").innerHTML=[card("Total Produced",(k.total_produced||0).toLocaleString("en-IN")+" pcs","","indigo","🏭"),card("Total Dispatched",(k.total_dispatched||0).toLocaleString("en-IN")+" pcs","","indigo","📦")].join("");
   document.querySelector("#prodTable tbody").innerHTML=(RAW.production||[]).map(p=>`<tr><td class="code">${p.code||""}</td><td>${p.name}</td><td class="r">${fmt(p.total)}</td></tr>`).join("")||`<tr><td colspan=3 class="empty">No production recorded yet</td></tr>`;}
@@ -776,6 +847,26 @@ function drawAlerts(){
 function report(type){const a=document.getElementById("reportArea");
   const head=cols=>"<thead><tr>"+cols.map(c=>`<th class="${c.r?'r':''}">${c.t}</th>`).join("")+"</tr></thead>";
   let html="",title="";
+  if(type==="prevmonth"){
+    const p=RAW.prev_month;
+    title="Previous Month Report";
+    if(!p){ a.innerHTML=`<div class="empty">No completed month saved yet. Run "Save snapshot / Roll over" at month-end, then this report fills in.</div>`; return; }
+    const cats=p.categories||[];
+    const totQty=cats.reduce((s,c)=>s+(c.q||0),0), totCost=cats.reduce((s,c)=>s+(c.$||0),0);
+    html=`<div class="cards" style="margin-bottom:14px">
+      ${card("Month",p.label||p.month,"","","📅")}
+      ${card("Consumption Cost",inr(p.consumption_cost),"","indigo","₹")}
+      ${card("Consumption Qty",fmt(p.consumption_qty),"","","📦")}
+      ${card("Closing Stock Value",inr(p.stock_value),"","green","🏷")}
+      ${card("Dead Stock Value",inr(p.dead_value),"frozen","amber","🗄")}
+    </div>`;
+    html+=`<h3>Consumption & Cost by Category — ${p.label||p.month}</h3>`;
+    html+=`<table>${head([{t:"Category"},{t:"Qty Consumed",r:1},{t:"Cost ₹",r:1},{t:"% of Cost",r:1}])}<tbody>`+
+      cats.slice().sort((x,y)=>(y.$||0)-(x.$||0)).map(c=>`<tr><td>${c.c}</td><td class="r">${fmt(c.q||0)}</td><td class="r">${inr(c.$||0)}</td><td class="r">${totCost?Math.round((c.$||0)/totCost*100):0}%</td></tr>`).join("")+
+      `<tr style="font-weight:800;background:#f2f2f2"><td>TOTAL</td><td class="r">${fmt(totQty)}</td><td class="r">${inr(totCost)}</td><td class="r">100%</td></tr></tbody></table>`;
+    html+=`<p class="sub" style="font-size:12px;margin-top:10px">Snapshot taken at month-end. Hit "Print / Save PDF" to hand to the director.</p>`;
+    a.innerHTML=`<h3>${title} — ${p.label||p.month}</h3>`+html; return;
+  }
   if(type==="reorder"){title="Reorder List — items below minimum";const ro=RAW.reorder||[];
     html=`<table>${head([{t:"Code"},{t:"Description"},{t:"Closing",r:1},{t:"Min",r:1},{t:"Suggested Order",r:1},{t:"Days Cover",r:1}])}<tbody>`+ro.map(r=>`<tr><td class="code">${r.code}</td><td>${r.desc}</td><td class="r">${fmt(r.closing)} ${r.uom}</td><td class="r">${fmt(r.min)}</td><td class="r"><b>${fmt(r.suggest)}</b></td><td class="r">${r.days_cover==null?"—":Math.round(r.days_cover)+" d"}</td></tr>`).join("")+`</tbody></table>`;}
   else if(type==="category"){title="Category Consumption & Cost (month)";
