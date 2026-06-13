@@ -202,18 +202,26 @@
   </section>
 
   <section class="page" id="mfg">
-    <h1 class="title">Cost per Part & Consumption Efficiency</h1>
-    <p class="sub">Standard consumable cost per finished part, from BOM ratios × parts produced × rate. The metric a serious manufacturer lives on.</p>
+    <h1 class="title">Cost per Piece — every part</h1>
+    <p class="sub">Consumable cost to make one piece of each part, straight from BOM ratios × purchase rate. Click any part for a printable cost card.</p>
     <div class="cards" id="mfgCards"></div>
-    <div class="panel"><h3>Cost per Part — by product (highest first)</h3>
-      <div style="overflow:auto;max-height:440px">
-        <table id="mfgTable"><thead><tr><th>Product</th><th class="r">Parts Made</th><th class="r">Std Consumable Cost</th><th class="r">Cost / Part</th><th class="r">Costed Lines</th></tr></thead><tbody></tbody></table>
-      </div></div>
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:6px">
+        <h3 style="border:none;margin:0;padding:0">All Parts — cost per piece</h3>
+        <input id="mfgSearch" class="search" placeholder="Search a part… e.g. Hero Cup, Clutch" style="flex:0 0 280px">
+      </div>
+      <div style="overflow:auto;max-height:460px">
+        <table id="mfgTable"><thead><tr>
+          <th>Product</th><th>Cell</th><th class="r">Cost / Piece ₹</th><th class="r">Lines</th><th></th>
+        </tr></thead><tbody></tbody></table>
+      </div>
+      <p class="sub" style="font-size:12px;margin-top:6px">Cost per piece = for each consumable, qty ÷ (jobs it covers) × purchase rate, summed. No production needed. Click any row for the printable line-by-line card. ⚠ marks lines still needing a ratio or rate.</p>
+    </div>
+    <div class="panel" id="mfgDetail" style="display:none"></div>
     <div class="panel"><h3>Price Variance — vendor rate drift (from RATE LOG)</h3>
       <div style="overflow:auto;max-height:300px">
         <table id="pvTable"><thead><tr><th>Item Code</th><th class="r">First Rate</th><th class="r">Latest Rate</th><th class="r">Change</th><th class="r">Deliveries</th></tr></thead><tbody></tbody></table>
       </div></div>
-    <p class="sub" style="font-size:12px">Note: "Std cost" is the planned/standard cost (BOM × output). Items marked as-per-usage or without a linked code/rate are excluded from the per-part figure and shown as uncosted in BOM. Fill production numbers + rates for full accuracy.</p>
   </section>
 
   <section class="page" id="analytics">
@@ -329,7 +337,7 @@
   <footer>BUILT FOR SHREE PRESSING · LIVE DATA FROM GOOGLE SHEETS · VIEW-ONLY</footer>
 </main>
 <script>
-const API_URL = "https://script.google.com/macros/s/AKfycbzYynHwp6koxxo54qLAGEAYL-gx_8BQEH1CKX9xQa1a8sRL5i4txLiLIh5Ua8hj7RKO/exec";   /* paste your Apps Script /exec URL here to go live */
+const API_URL = "https://script.google.com/macros/s/AKfycbxkbgK1A6L4zGg1gLUheySs--DzHnLBniqHmbFHUNOQcWmTQjyqdCXcHY20VGhmB9RX/exec";   /* paste your Apps Script /exec URL here to go live */
 let TOKEN = null;     // set after login (kept in memory only)
 let RAW=null, mode="cost", itemFilter="all", alertFilter="all", abcFilter="all", timer=null, catChart,healthChart,weekChart,paretoChart,abcChart,trendCostChart,trendQtyChart,svaChart;
 const inr=n=>"₹"+Math.round(n||0).toLocaleString("en-IN");
@@ -408,15 +416,24 @@ function sample(){
       {month:"2026-06",label:"Jun 2026",consumption_qty:3005,consumption_cost:103900,stock_value:372000,dead_value:7000,categories:[{c:"Corrugated",q:1300,$:15600},{c:"Oils Lubricants",q:160,$:40000},{c:"Adhesive",q:420,$:18900},{c:"PPE",q:280,$:8400}]}
     ],
     manufacturing:[
-      {product:"Hero Cup",made:3060,std_cost:8200,cost_per_part:2.68,costable:2,total_lines:4,lines:[
-        {item:"Cleaning chemical- Hiclean Ls 40",code:"CON-000022",costable:true,std_qty:110,std_cost:19800,uom:"LTR"},
-        {item:"Corrugated Box 5 Ply 370 X 210 X 130",code:"PKG-000005",costable:true,std_qty:1700,std_cost:18700,uom:"NOS"}
+      {product:"Hero Cup",cell:"Krushna Chavan",dept:"Cup Cell",made:null,cost_per_part:36.9641,cost_per_piece_full:36.9641,costable:4,total_lines:5,uncosted_lines:1,lines:[
+        {item:"Anti-Rust Oil (Bajaj)",code:"CN000102",method:"direct",qty:5,uom:"LTR",per:"3000 jobs",qty_per_piece:0.001667,rate:282,cost_per_piece:0.47},
+        {item:"Corrugated Box 5 Ply 370 X 210 X 130",code:"PKG-000005",method:"direct",qty:204,uom:"NOS",per:"3060 jobs",qty_per_piece:0.066667,rate:11,cost_per_piece:0.7333},
+        {item:"Poly Bag 8 X 14",code:"PKG-000019",method:"direct",qty:1,uom:"NOS",per:"5 jobs",qty_per_piece:0.2,rate:169,cost_per_piece:33.8},
+        {item:"Stretch Film Roll 500MM",code:"PKG-000022",method:"direct",qty:2,uom:"NOS",per:"204 boxes",qty_per_piece:0.009804,rate:200,cost_per_piece:1.9608},
+        {item:"Cotton Waste",code:"CN000057",method:"uncosted",qty:8,uom:"KG",per:"month (shared)",rate:32,cost_per_piece:null}
       ]},
-      {product:"Star City",made:3000,std_cost:6400,cost_per_part:2.13,costable:1,total_lines:3,lines:[
-        {item:"Poly Bag 8 X 14",code:"PKG-000019",costable:true,std_qty:22,std_cost:3718,uom:"KG"}
+      {product:"Star City Cup",cell:"Krushna Chavan",dept:"Cup Cell",made:3000,std_cost:4350,full_cost:6150,cost_per_part:1.45,cost_per_piece_full:2.05,costable:2,total_lines:3,uncosted_lines:1,lines:[
+        {item:"Poly Bag 8 X 14",code:"PKG-000019",method:"direct",qty:1,uom:"NOS",per:"5 jobs",qty_per_piece:0.2,rate:169,cost_per_piece:33.8,month_cost:101400},
+        {item:"Cotton Waste",code:"CN000057",method:"allocated",qty:8,uom:"KG",per:"month (shared)",rate:32,cost_per_piece:0.6,month_cost:1800},
+        {item:"Oil - Deep Draw- 300",code:"CON-000047",method:"uncosted",per:"as per usage",rate:182,cost_per_piece:null,month_cost:null}
       ]},
-      {product:"Clutch Plate 102",made:1338,std_cost:3100,cost_per_part:2.32,costable:2,total_lines:3,lines:[]},
-      {product:"Yamaha Bkt",made:5000,std_cost:1200,cost_per_part:0.24,costable:3,total_lines:4,lines:[]}
+      {product:"K70 Clutch Plate 102",cell:"Rameshwar",dept:"Clutch",made:1338,std_cost:3100,full_cost:4000,cost_per_part:2.32,cost_per_piece_full:2.99,costable:2,total_lines:3,uncosted_lines:1,lines:[
+        {item:"Rust Preventive Oil",code:"CN000111",method:"direct",qty:8,uom:"LTR",per:"1338 jobs",qty_per_piece:0.005979,rate:310,cost_per_piece:1.8535,month_cost:2480},
+        {item:"Corrugated Box 5 Ply 12 X 12 X 10",code:"PKG-000002",method:"direct",qty:7,uom:"NOS",per:"200 jobs",qty_per_piece:0.035,rate:19,cost_per_piece:0.665,month_cost:890},
+        {item:"Hand Gloves - Knitted",code:"LWE-007",method:"allocated",qty:23,uom:"PAIR",per:"manpower",rate:28,cost_per_piece:0.4814,month_cost:644}
+      ]},
+      {product:"Yamaha Bkt",cell:"Ganesh Sir",dept:"Magnet",made:5000,std_cost:1200,full_cost:1800,cost_per_part:0.24,cost_per_piece_full:0.36,costable:3,total_lines:4,uncosted_lines:1,lines:[]}
     ],
     price_variance:[
       {code:"CN000102",first:240,last:268,change_pct:0.1167,n:3},
@@ -863,32 +880,104 @@ RULES:
   }
   btn.disabled=false;
 }
+let mfgSel=null;
 function renderMfg(){
   const m=RAW.manufacturing||[];
   const pv=RAW.price_variance||[];
-  // KPI cards
-  const totStd=m.reduce((s,p)=>s+(p.std_cost||0),0);
-  const withCpp=m.filter(p=>p.cost_per_part!=null);
-  const avgCpp=withCpp.length?withCpp.reduce((s,p)=>s+p.cost_per_part,0)/withCpp.length:0;
-  const priciest=withCpp.slice().sort((a,b)=>b.cost_per_part-a.cost_per_part)[0];
+  const withCpp=m.filter(p=>p.cost_per_piece_full!=null||p.cost_per_part!=null);
+  const priciest=withCpp.slice().sort((a,b)=>(b.cost_per_piece_full||b.cost_per_part||0)-(a.cost_per_piece_full||a.cost_per_part||0))[0];
+  const totMonth=m.reduce((s,p)=>s+(p.full_cost||p.std_cost||0),0);
   document.getElementById("mfgCards").innerHTML=[
-    card("Products Costed",withCpp.length+" / "+m.length,"need production + rates","","⚙️"),
-    card("Total Std Consumable Cost",inr(totStd),"this month's output","indigo","₹"),
-    card("Avg Cost / Part",withCpp.length?("₹"+(Math.round(avgCpp*100)/100)):"—","across costed products","green","÷"),
-    card("Priciest Part",priciest?priciest.product:"—",priciest?("₹"+(Math.round(priciest.cost_per_part*100)/100)+"/part"):"add data","amber","▲")
+    card("Parts Costed",withCpp.length+" / "+m.length,"need production + rates","","⚙️"),
+    card("Total Consumable Cost",inr(totMonth),"this month, all parts","indigo","₹"),
+    card("Priciest Part",priciest?priciest.product:"—",priciest?("₹"+r2(priciest.cost_per_piece_full||priciest.cost_per_part)+"/pc"):"add data","amber","▲"),
+    card("Avg Cost / Piece",withCpp.length?("₹"+r2(withCpp.reduce((s,p)=>s+(p.cost_per_piece_full||p.cost_per_part||0),0)/withCpp.length)):"—","across costed parts","green","÷")
   ].join("");
-  document.querySelector("#mfgTable tbody").innerHTML = m.length? m.map(p=>`<tr>
-    <td><b>${p.product}</b></td>
-    <td class="r">${p.made!=null?fmt(p.made):'<span style="color:var(--vlow)">no production</span>'}</td>
-    <td class="r">${p.std_cost?inr(p.std_cost):"—"}</td>
-    <td class="r">${p.cost_per_part!=null?"<b>₹"+(Math.round(p.cost_per_part*100)/100)+"</b>":"—"}</td>
-    <td class="r">${p.costable}/${p.total_lines}</td></tr>`).join("")
-    : `<tr><td colspan=5 class="empty">No BOM/production data yet. Fill BOM ratios, link item codes, and enter production.</td></tr>`;
+  drawMfgTable();
   document.querySelector("#pvTable tbody").innerHTML = pv.length? pv.map(v=>{
     const up=v.change_pct>0; const col=up?'style="color:var(--vlow);font-weight:700"':'style="color:var(--ok);font-weight:700"';
     return `<tr><td class="code">${v.code}</td><td class="r">₹${fmt(v.first)}</td><td class="r">₹${fmt(v.last)}</td>
       <td class="r" ${col}>${up?"▲ ":"▼ "}${Math.abs(Math.round(v.change_pct*100))}%</td><td class="r">${v.n}</td></tr>`;}).join("")
     : `<tr><td colspan=5 class="empty">Need 2+ dated entries per item in RATE LOG to show price drift.</td></tr>`;
+  // keep an open detail in sync after refresh
+  if(mfgSel){ const still=m.find(p=>p.product===mfgSel); if(still) showMfgDetail(mfgSel); }
+}
+function r2(n){ return (Math.round((n||0)*100)/100).toLocaleString("en-IN"); }
+function drawMfgTable(){
+  const m=RAW.manufacturing||[];
+  const q=(document.getElementById("mfgSearch").value||"").toLowerCase();
+  const rows=m.filter(p=>!q||(p.product+" "+(p.cell||"")).toLowerCase().includes(q));
+  document.querySelector("#mfgTable tbody").innerHTML = rows.length? rows.map(p=>{
+    const cpp=p.cost_per_piece_full!=null?p.cost_per_piece_full:p.cost_per_part;
+    return `<tr style="cursor:pointer" onclick="showMfgDetail('${p.product.replace(/'/g,"\\'")}')">
+      <td><b>${p.product}</b></td>
+      <td style="color:var(--mut);font-size:12px">${p.cell||""}</td>
+      <td class="r">${cpp!=null?'<b style="color:var(--indigo)">₹'+r2(cpp)+'</b>':"—"}</td>
+      <td class="r">${p.costable}/${p.total_lines}${p.uncosted_lines?'<span title="'+p.uncosted_lines+' line(s) need a ratio/rate" style="color:var(--low)"> ⚠</span>':''}</td>
+      <td class="r" style="color:var(--indigo);font-size:12px">view ▸</td></tr>`;}).join("")
+    : `<tr><td colspan=5 class="empty">No parts match. Add BOM ratios (qty per N jobs) + rates.</td></tr>`;
+}
+function showMfgDetail(product){
+  mfgSel=product;
+  const p=(RAW.manufacturing||[]).find(x=>x.product===product);
+  const el=document.getElementById("mfgDetail");
+  if(!p){ el.style.display="none"; return; }
+  el.style.display="block";
+  const order={direct:0,allocated:1,uncosted:2};
+  const lines=(p.lines||[]).slice().sort((a,b)=>(order[a.method]-order[b.method])||((b.cost_per_piece||0)-(a.cost_per_piece||0)));
+  const total=p.cost_per_piece_full!=null?p.cost_per_piece_full:(p.cost_per_part||null);
+  const p4=n=>"₹"+(Math.round((n||0)*10000)/10000).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:4});
+  const rowsHtml=lines.map(l=>{
+    const ratio=(l.method==="direct"&&l.qty!=null)?`${fmt(l.qty)} ${l.uom||""} per ${l.per}`:(l.per||"—");
+    return `<tr>
+      <td class="code">${l.code||"—"}</td>
+      <td>${l.item}</td>
+      <td style="color:var(--mut);font-size:12px">${ratio}</td>
+      <td class="r">${l.rate!=null?"₹"+r2(l.rate):"—"}</td>
+      <td class="r">${l.cost_per_piece!=null?"<b>"+p4(l.cost_per_piece)+"</b>":'<span style="color:var(--low)">add data</span>'}</td></tr>`;
+  }).join("");
+  el.innerHTML=`
+    <div class="noprint" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px">
+      <h3 style="border:none;margin:0;padding:0">${p.product} — cost per piece</h3>
+      <div style="display:flex;gap:8px">
+        <button class="seg" onclick="printCostCard()">🖨 Print this card</button>
+        <button class="seg" onclick="document.getElementById('mfgDetail').style.display='none';mfgSel=null">✕ close</button>
+      </div>
+    </div>
+    <div id="costCard" style="border:1px solid #e3e6ef;border-radius:12px;padding:20px 24px;background:#fff">
+      <div style="border-bottom:2px solid #1F4E78;padding-bottom:8px;margin-bottom:14px">
+        <span style="font-size:18px;font-weight:800;color:#1F4E78">SHREE PRESSING</span>
+        <span style="font-size:14px;color:#444;margin-left:10px">Cost per Piece — ${p.product}</span>
+        <span style="float:right;font-size:11px;color:#999">${new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"})}</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr style="background:#1F4E78;color:#fff">
+          <th style="padding:7px 8px;text-align:left">Code</th>
+          <th style="padding:7px 8px;text-align:left">Consumable</th>
+          <th style="padding:7px 8px;text-align:left">Usage</th>
+          <th style="padding:7px 8px;text-align:right">Rate ₹</th>
+          <th style="padding:7px 8px;text-align:right">Cost / Piece</th>
+        </tr></thead>
+        <tbody>${rowsHtml||`<tr><td colspan=5 style="padding:14px;text-align:center;color:#999">No lines.</td></tr>`}</tbody>
+        <tfoot><tr style="background:#eef0fb;border-top:2px solid #1F4E78">
+          <td colspan=4 style="padding:11px 8px;text-align:right;font-size:15px;font-weight:800;color:#1F4E78">TOTAL COST PER PIECE</td>
+          <td style="padding:11px 8px;text-align:right;font-size:17px;font-weight:800;color:#1F4E78">${total!=null?p4(total):"—"}</td>
+        </tr></tfoot>
+      </table>
+      ${p.uncosted_lines?`<div style="font-size:11px;color:#b8860b;margin-top:9px">⚠ ${p.uncosted_lines} line(s) marked "add data" are not in the total — add a ratio (qty per N jobs) or a rate to include them.</div>`:""}
+    </div>`;
+  el.scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+function printCostCard(){
+  const card=document.getElementById("costCard");
+  if(!card) return;
+  const w=window.open("","_print","width=800,height=900");
+  w.document.write(`<html><head><title>Cost per Piece</title>
+    <style>body{font-family:Arial,Helvetica,sans-serif;margin:24px;color:#222}
+    table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #eee}
+    @media print{@page{margin:14mm}}</style></head><body>${card.outerHTML}</body></html>`);
+  w.document.close(); w.focus();
+  setTimeout(()=>{ w.print(); w.close(); },300);
 }
 function renderProd(){const k=RAW.kpi;
   document.getElementById("prodKpi").innerHTML=[card("Total Produced",(k.total_produced||0).toLocaleString("en-IN")+" pcs","","indigo","🏭"),card("Total Dispatched",(k.total_dispatched||0).toLocaleString("en-IN")+" pcs","","indigo","📦")].join("");
@@ -951,7 +1040,7 @@ function renderAnalytics(){
 // ---- Standard vs Actual cost, per product ----
 function populateSvA(){
   const sel=document.getElementById("svaSel");
-  const m=(RAW.manufacturing||[]).filter(p=>(p.lines||[]).some(l=>l.costable));
+  const m=(RAW.manufacturing||[]).filter(p=>(p.lines||[]).some(l=>l.method==="direct"));
   const cur=sel.value;
   if(!m.length){ sel.innerHTML=`<option value="">No costable products yet</option>`; return; }
   sel.innerHTML=m.map(p=>`<option value="${p.product}">${p.product}${p.made!=null?" — "+fmt(p.made)+" pcs":""}</option>`).join("");
@@ -961,19 +1050,20 @@ function renderSvA(){
   populateSvA();
   const sel=document.getElementById("svaSel");
   const m=RAW.manufacturing||[];
-  const prod=m.find(p=>p.product===sel.value) || m.find(p=>(p.lines||[]).some(l=>l.costable));
+  const prod=m.find(p=>p.product===sel.value) || m.find(p=>(p.lines||[]).some(l=>l.method==="direct"));
   const byCode={}; (RAW.items||[]).forEach(i=>byCode[i.code]=i);
   const sumEl=document.getElementById("svaSummary");
   const tb=document.querySelector("#svaTable tbody");
   if(!prod){ sumEl.innerHTML=""; tb.innerHTML=`<tr><td colspan=8 class="empty">Add BOM ratios (qty per N jobs), link item codes, and enter production to compare.</td></tr>`;
     if(svaChart)svaChart.destroy(); svaChart=null; return; }
-  // build per-consumable std vs actual
-  const lines=(prod.lines||[]).filter(l=>l.costable).map(l=>{
+  // build per-consumable std vs actual (direct lines only — those have a true standard)
+  const lines=(prod.lines||[]).filter(l=>l.method==="direct").map(l=>{
     const it=byCode[l.code]||{};
+    const stdCost=l.line_cost||0;
     const actualCost=it.consumed_value||0, actualQty=it.issued||0;
-    const variance=actualCost-(l.std_cost||0);
-    const varPct=(l.std_cost>0)?variance/l.std_cost:null;
-    return {code:l.code,item:l.item,std_qty:l.std_qty,std_cost:l.std_cost,
+    const variance=actualCost-stdCost;
+    const varPct=(stdCost>0)?variance/stdCost:null;
+    return {code:l.code,item:l.item,std_qty:l.std_qty,std_cost:stdCost,
       act_qty:actualQty,act_cost:actualCost,variance,varPct,uom:l.uom};
   }).sort((a,b)=>b.std_cost-a.std_cost);
   const totStd=lines.reduce((s,l)=>s+l.std_cost,0);
@@ -1089,6 +1179,7 @@ document.getElementById("moveType").onchange=drawMovement;
 document.getElementById("bomSearch").oninput=drawBOM;
 document.getElementById("aiQ").addEventListener("keydown",e=>{if((e.ctrlKey||e.metaKey)&&e.key==="Enter")askAI();});
 document.getElementById("bomView").onchange=drawBOM;
+document.getElementById("mfgSearch").oninput=drawMfgTable;
 document.getElementById("auto").onchange=e=>{if(e.target.checked)startAuto();else clearInterval(timer);};
 function startAuto(){clearInterval(timer);timer=setInterval(load,10000);}
 document.getElementById("loginBtn").onclick=doLogin;
