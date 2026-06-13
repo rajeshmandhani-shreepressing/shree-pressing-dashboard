@@ -129,6 +129,8 @@
     <div class="cards" id="kpiTop"></div>
     <div class="cards two" id="kpiMid"></div>
     <div class="panel" id="finPanel" style="margin-bottom:14px"></div>
+
+    <div class="panel" id="ratePanel" style="margin-bottom:14px;display:none"></div>
     <div class="bannerstack" id="bannerStack"></div>
     <div class="banner" id="reorderBanner" style="display:none"></div>
     <div class="panel"><h3>REORDER NOW — items below minimum</h3>
@@ -314,7 +316,7 @@
   <footer>BUILT FOR SHREE PRESSING · LIVE DATA FROM GOOGLE SHEETS · VIEW-ONLY</footer>
 </main>
 <script>
-const API_URL = "https://script.google.com/macros/s/AKfycbwkI_wfupQZI48arYg3N5LavkyhGqGxkkghCZjjezZ4OOur5nbrKyjcfB5J-7uZ5p7L/exec";   /* paste your Apps Script /exec URL here to go live */
+const API_URL = "https://script.google.com/macros/s/AKfycbzoIhXULnt3vI5sOYQqKVNG3LKepOKHVwfXrq0B7UFosGvgXw_8Y-MPzjCfVZBTmIxx/exec";   /* paste your Apps Script /exec URL here to go live */
 let TOKEN = null;     // set after login (kept in memory only)
 let RAW=null, mode="cost", itemFilter="all", alertFilter="all", abcFilter="all", timer=null, catChart,healthChart,weekChart,paretoChart,abcChart,trendCostChart,trendQtyChart;
 const inr=n=>"₹"+Math.round(n||0).toLocaleString("en-IN");
@@ -366,6 +368,11 @@ function sample(){
       stockout_count:items.filter(i=>i.closing===0).length,
       total_produced:1550,total_dispatched:1460,qty_issued:items.reduce((s,i)=>s+i.issued,0)},
     financials:{purchase_cost:148000,consumption_value:103900,gap:44100,gap_pct:0.424,rate_log_lines:12,overbuying:true},
+    rate_changes:[
+      {code:"CON-000078",desc:"Bonderite L-FM PL 101 (Parco Lubricants)",uom:"LTR",avg_prev:280,avg_this:312,change_pct:0.114,cost_impact:1280,issued:40},
+      {code:"CN000104",desc:"Oil - Hydrolic 68 Nos",uom:"LTR",avg_prev:120,avg_this:114,change_pct:-0.05,cost_impact:-540,issued:90},
+      {code:"CON-000021",desc:"DST- Degreez/15P",uom:"LTR",avg_prev:470,avg_this:494,change_pct:0.051,cost_impact:720,issued:30}
+    ],
     items,categories:cats,types:types,
     production:[{code:"PRD-1",name:"Hero Cup",total:900},{code:"PRD-2",name:"Flywheel Ring",total:650}],
     reorder:vlow.concat(low).map(i=>({code:i.code,desc:i.desc,closing:i.closing,uom:i.uom,min:i.min,days_cover:i.days_cover,trend:i.trend,suggest:Math.max(0,i.max-i.closing)})),
@@ -522,7 +529,41 @@ function renderDash(){
   bs.innerHTML=bans.join("");
   if(ro.length){b.style.display="flex";b.innerHTML=`⚠ REORDER NOW — ${ro.length} items below minimum level`;}else b.style.display="none";
   document.querySelector("#reorderTable tbody").innerHTML=ro.length?ro.map(r=>`<tr class="alertrow"><td class="code">${r.code}</td><td>${r.desc}</td><td class="r"><b>${fmt(r.closing)}</b> ${r.uom}</td><td class="r">${fmt(r.min)}</td><td class="r">${r.days_cover==null?"—":Math.round(r.days_cover)+" d"}</td><td class="trend">→ ${r.trend}</td></tr>`).join(""):`<tr><td colspan=6 class="empty">All stock above minimum ✓</td></tr>`;
+  renderRatePanel();
   drawCat();drawHealth();drawWeek();
+}
+function renderRatePanel(){
+  const rc=(RAW.rate_changes||[]).filter(r=>r.change_pct!=null);
+  const el=document.getElementById("ratePanel");
+  if(!rc.length){ el.style.display="none"; return; }
+  el.style.display="block";
+  const up=rc.filter(r=>r.change_pct>0), down=rc.filter(r=>r.change_pct<0);
+  const totImpact=rc.reduce((s,r)=>s+(r.cost_impact||0),0);
+  const rows=rc.slice(0,12).map(r=>{
+    const pct=Math.round(r.change_pct*100), upc=r.change_pct>0;
+    const col=upc?"var(--vlow)":"var(--ok)";
+    const arrow=upc?"▲":"▼";
+    return `<tr><td class="code">${r.code}</td><td>${r.desc}</td>
+      <td class="r">${r.avg_prev?inr(r.avg_prev):"—"}</td>
+      <td class="r">${r.avg_this?inr(r.avg_this):"—"}</td>
+      <td class="r" style="color:${col};font-weight:700">${arrow} ${pct>0?"+":""}${pct}%</td>
+      <td class="r" style="color:${(r.cost_impact||0)>0?'var(--vlow)':'var(--ok)'}">${(r.cost_impact||0)>0?"+":""}${inr(r.cost_impact||0)}</td></tr>`;
+  }).join("");
+  el.innerHTML=`<div style="padding:14px 18px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h3 style="border:none;margin:0;padding:0">Purchase Rate — This Month vs Last Month</h3>
+      <span style="background:${totImpact>0?'var(--vlowbg)':'var(--okbg)'};color:${totImpact>0?'var(--vlow)':'var(--ok)'};font-weight:700;padding:4px 12px;border-radius:20px;font-size:12px">
+        ${totImpact>0?"⚠ +"+inr(totImpact)+" rate-driven cost":"✓ "+inr(totImpact)+" rate impact"}</span>
+    </div>
+    <div style="color:var(--mut);font-size:12px;margin-bottom:8px">${up.length} item(s) costlier, ${down.length} cheaper than last month (average purchase rate). Cost impact = this month's issued qty × rate change.</div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead><tr style="background:#1F4E78;color:#fff">
+        <th style="padding:6px;text-align:left">Code</th><th style="padding:6px;text-align:left">Item (system name)</th>
+        <th style="padding:6px;text-align:right">Avg ₹ last mo</th><th style="padding:6px;text-align:right">Avg ₹ this mo</th>
+        <th style="padding:6px;text-align:right">Change</th><th style="padding:6px;text-align:right">Cost impact</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
 }
 function setMode(m){mode=m;document.getElementById("bCost").classList.toggle("on",m==="cost");document.getElementById("bQty").classList.toggle("on",m==="qty");document.getElementById("modeLabel").textContent=m==="cost"?"Cost":"Quantity";drawCat();}
 function drawCat(){const cats=[...RAW.categories].sort((a,b)=>mode==="cost"?b.cost-a.cost:b.qty-a.qty).slice(0,10);
