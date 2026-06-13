@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Shree Pressing — Consumables Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   :root{
@@ -13,7 +16,7 @@
     --vlow:#c0264a; --vlowbg:#fdecef; --green:#0f9d58; --greenbg:#e8f7ee;
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{background:var(--bg);color:var(--ink);font-family:"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:14px}
+  body{background:var(--bg);color:var(--ink);font-family:"Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:14px;-webkit-font-smoothing:antialiased;letter-spacing:-0.01em}
   .topbar{height:4px;background:linear-gradient(90deg,var(--accent),#f7c34a)}
   nav{background:var(--card);border-bottom:1px solid var(--line);padding:0 22px;display:flex;align-items:center;gap:4px;flex-wrap:wrap;position:sticky;top:0;z-index:20}
   nav .tab{padding:18px 16px;color:var(--mut);cursor:pointer;font-weight:600;border-bottom:2px solid transparent;display:flex;align-items:center;gap:7px;font-size:14px}
@@ -29,7 +32,7 @@
   .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:16px}
   .c{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px 22px;position:relative}
   .c .lab{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--mut);font-weight:700}
-  .c .big{font-size:34px;font-weight:800;margin-top:12px;font-family:"Consolas",monospace}
+  .c .big{font-size:34px;font-weight:700;margin-top:12px;font-family:"JetBrains Mono","Consolas",monospace;letter-spacing:-0.02em}
   .c .note{font-size:13px;margin-top:6px;color:var(--mut)}
   .c .ic{position:absolute;top:18px;right:18px;width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:18px}
   .c.green{background:var(--greenbg);border-color:#bfe6cd} .c.green .big{color:var(--green)} .c.green .ic{background:var(--green);color:#fff}
@@ -45,7 +48,7 @@
   th{font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:var(--mut);font-weight:700}
   td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   tr.alertrow td{background:var(--vlowbg)}
-  .code{color:var(--vlow);font-weight:700;font-family:monospace}
+  .code{color:var(--vlow);font-weight:700;font-family:"JetBrains Mono",monospace;font-size:12px}
   .pill{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:800}
   .pill.VERYLOW{background:var(--vlowbg);color:var(--vlow)} .pill.LOW{background:var(--lowbg);color:var(--low)} .pill.OK{background:var(--okbg);color:var(--ok)}
   .trend{color:var(--mut);font-size:12px}
@@ -125,6 +128,7 @@
   <section class="page on" id="dash">
     <div class="cards" id="kpiTop"></div>
     <div class="cards two" id="kpiMid"></div>
+    <div class="panel" id="finPanel" style="margin-bottom:14px"></div>
     <div class="bannerstack" id="bannerStack"></div>
     <div class="banner" id="reorderBanner" style="display:none"></div>
     <div class="panel"><h3>REORDER NOW — items below minimum</h3>
@@ -224,6 +228,12 @@
         <option value="__all">All (overview)</option>
       </select>
     </div>
+    <div class="filters" id="abcFilters" style="margin-top:4px">
+      <div class="chip on" data-abc="all">All Items</div>
+      <div class="chip" data-abc="A">Class A <span class="b">top 70% spend</span></div>
+      <div class="chip" data-abc="B">Class B <span class="b">next 20%</span></div>
+      <div class="chip" data-abc="C">Class C <span class="b">bottom 10%</span></div>
+    </div>
     <div class="cards" id="abcCards"></div>
     <div class="grid2">
       <div class="panel"><h3>Pareto — top items driving spend (80/20)</h3><div class="chartbox"><canvas id="paretoChart"></canvas></div></div>
@@ -304,9 +314,9 @@
   <footer>BUILT FOR SHREE PRESSING · LIVE DATA FROM GOOGLE SHEETS · VIEW-ONLY</footer>
 </main>
 <script>
-const API_URL = "https://script.google.com/macros/s/AKfycbwXuUf1lXNEhg3vS5G0lCCmbpjwKATUuCSmasRq_Jk5ACa1GgDT-LnrXVwkYutvrYiJ/exec";   /* paste your Apps Script /exec URL here to go live */
+const API_URL = "https://script.google.com/macros/s/AKfycbwkI_wfupQZI48arYg3N5LavkyhGqGxkkghCZjjezZ4OOur5nbrKyjcfB5J-7uZ5p7L/exec";   /* paste your Apps Script /exec URL here to go live */
 let TOKEN = null;     // set after login (kept in memory only)
-let RAW=null, mode="cost", itemFilter="all", alertFilter="all", timer=null, catChart,healthChart,weekChart,paretoChart,abcChart,trendCostChart,trendQtyChart;
+let RAW=null, mode="cost", itemFilter="all", alertFilter="all", abcFilter="all", timer=null, catChart,healthChart,weekChart,paretoChart,abcChart,trendCostChart,trendQtyChart;
 const inr=n=>"₹"+Math.round(n||0).toLocaleString("en-IN");
 const cls=s=>(s||"").replace(/\s+/g,"");
 const fmt=n=>(Math.round(n*100)/100).toLocaleString("en-IN");
@@ -352,7 +362,10 @@ function sample(){
   return {updated:new Date().toISOString(),
     kpi:{items_tracked:175,stock_value:items.reduce((s,i)=>s+i.stock_value,0),consumed_value:items.reduce((s,i)=>s+i.consumed_value,0),
       below_min:vlow.length+low.length,very_low:vlow.length,low:low.length,ok:ok.length,dead_stock:1,
+      dead_stock_value:items.filter(i=>i.dead&&i.closing>0).reduce((s,i)=>s+i.stock_value,0),
+      stockout_count:items.filter(i=>i.closing===0).length,
       total_produced:1550,total_dispatched:1460,qty_issued:items.reduce((s,i)=>s+i.issued,0)},
+    financials:{purchase_cost:148000,consumption_value:103900,gap:44100,gap_pct:0.424,rate_log_lines:12,overbuying:true},
     items,categories:cats,types:types,
     production:[{code:"PRD-1",name:"Hero Cup",total:900},{code:"PRD-2",name:"Flywheel Ring",total:650}],
     reorder:vlow.concat(low).map(i=>({code:i.code,desc:i.desc,closing:i.closing,uom:i.uom,min:i.min,days_cover:i.days_cover,trend:i.trend,suggest:Math.max(0,i.max-i.closing)})),
@@ -461,13 +474,40 @@ function card(lab,big,note,kind,ic){return `<div class="c ${kind||''}"><div clas
 function renderDash(){
   const k=RAW.kpi;
   document.getElementById("kpiTop").innerHTML=[
-    card("Items Tracked",k.items_tracked,"","","🧩"),
-    card("Stock Value",inr(k.stock_value),"","green","₹"),
-    card("Below Min",k.below_min,"Reorder now","red","⚠"),
-    card("Dead Stock (30+ days)",k.dead_stock,"Review usage","amber","🗄")].join("");
+    card("Stock Value",inr(k.stock_value),"capital on shelf","green","₹"),
+    card("Below Min",k.below_min,"reorder now","red","⚠"),
+    card("Dead Stock Value",inr(k.dead_stock_value||0),(k.dead_stock||0)+" idle items","amber","🗄"),
+    card("Stockout Risk",k.stockout_count||0,"items at zero stock","red","⛔")].join("");
   document.getElementById("kpiMid").innerHTML=[
     card("Total Produced",(k.total_produced||0).toLocaleString("en-IN")+" pcs","","indigo","🏭"),
     card("Total Dispatched",(k.total_dispatched||0).toLocaleString("en-IN")+" pcs","","indigo","📦")].join("");
+  // ----- Monthly Financials: purchase vs consumption -----
+  const f=RAW.financials||{};
+  const over=f.overbuying;
+  document.getElementById("finPanel").innerHTML=`
+    <div style="padding:14px 18px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h3 style="border:none;margin:0;padding:0">This Month — Money In vs Money Out</h3>
+        ${over?`<span style="background:var(--vlowbg);color:var(--vlow);font-weight:700;padding:4px 12px;border-radius:20px;font-size:12px">⚠ Buying faster than consuming</span>`
+              :`<span style="background:var(--okbg);color:var(--ok);font-weight:700;padding:4px 12px;border-radius:20px;font-size:12px">✓ In balance</span>`}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
+        <div style="background:#eef0fb;border-radius:10px;padding:14px">
+          <div style="color:var(--mut);font-size:12px;font-weight:600">PURCHASE COST (inward bills)</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;color:var(--indigo)">${inr(f.purchase_cost||0)}</div>
+        </div>
+        <div style="background:#eaf7ef;border-radius:10px;padding:14px">
+          <div style="color:var(--mut);font-size:12px;font-weight:600">CONSUMPTION VALUE (issued to floor)</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;color:var(--ok)">${inr(f.consumption_value||0)}</div>
+        </div>
+        <div style="background:${over?'#fdecea':'#f7f8fa'};border-radius:10px;padding:14px">
+          <div style="color:var(--mut);font-size:12px;font-weight:600">NET (stock build / draw-down)</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;color:${(f.gap||0)>0?'var(--vlow)':'var(--ok)'}">${(f.gap||0)>0?'+':''}${inr(f.gap||0)}</div>
+          <div style="color:var(--mut);font-size:11px;margin-top:2px">${f.gap_pct!=null?(Math.round(f.gap_pct*100))+'% vs consumption':''}</div>
+        </div>
+      </div>
+      <p style="color:var(--mut);font-size:11px;margin:10px 0 0">Purchase = inward bills (RATE LOG) this month. Consumption = value issued to the shopfloor. A large positive net means cash is going into stock faster than it's being used.</p>
+    </div>`;
   const ro=RAW.reorder||[],b=document.getElementById("reorderBanner");
   // banner stack: top critical/warn alert types summarized
   const al=RAW.alerts||[];
@@ -509,7 +549,10 @@ function renderItems(){const k=RAW.kpi;
 function drawItems(){const q=(document.getElementById("itemSearch").value||"").toLowerCase();
   let rows=RAW.items.filter(it=>{const f=itemFilter==="all"?true:itemFilter==="dead"?it.dead:it.status===itemFilter;
     const s=!q||(it.code+" "+it.desc+" "+(it.short||"")).toLowerCase().includes(q);return f&&s;});
-  document.querySelector("#itemsTable tbody").innerHTML=rows.length?rows.map(it=>`<tr><td class="code">${it.code}</td><td>${it.desc}</td><td>${it.uom||""}</td><td class="r">${it.rate?inr(it.rate):"—"}</td><td class="r">${fmt(it.received||0)}</td><td class="r">${fmt(it.issued||0)}</td><td class="r">${fmt(it.closing)}</td><td class="r">${it.stock_value?inr(it.stock_value):"—"}</td><td class="r">${fmt(it.min)}</td><td class="r">${it.avgday?fmt(it.avgday):"—"}</td><td class="r">${it.days_cover==null?"—":Math.round(it.days_cover)+" d"}</td><td><span class="pill ${cls(it.status)}">${it.status}</span></td><td class="trend">→ ${it.trend}</td></tr>`).join(""):`<tr><td colspan=13 class="empty">No items match the filter/search</td></tr>`;}
+  document.querySelector("#itemsTable tbody").innerHTML=rows.length?rows.map(it=>{
+    const idle=it.dead&&it.closing>0; // idle capital: 60+ real days since last issue
+    const idleTip=it.days_since_issue!=null?("idle "+it.days_since_issue+" days — frozen capital"):"idle capital";
+    return `<tr${idle?' style="background:#fff8e1"':''}><td class="code">${it.code}</td><td>${it.desc}${idle?' <span title="'+idleTip+'" style="color:#b8860b">🗄 '+it.days_since_issue+'d</span>':''}</td><td>${it.uom||""}</td><td class="r">${it.rate?inr(it.rate):"—"}</td><td class="r">${fmt(it.received||0)}</td><td class="r">${fmt(it.issued||0)}</td><td class="r">${fmt(it.closing)}</td><td class="r">${it.stock_value?inr(it.stock_value):"—"}</td><td class="r">${fmt(it.min)}</td><td class="r">${it.avgday?fmt(it.avgday):"—"}</td><td class="r">${it.days_cover==null?"—":Math.round(it.days_cover)+" d"}</td><td><span class="pill ${cls(it.status)}">${it.status}</span></td><td class="trend">→ ${it.trend}</td></tr>`;}).join(""):`<tr><td colspan=13 class="empty">No items match the filter/search</td></tr>`;}
 let moveFilter="all";
 function renderMovement(){
   document.getElementById("mAll").textContent=RAW.items.length;
@@ -781,8 +824,9 @@ function populateFocus(){
 function analyticsItems(){
   const gb=document.getElementById("groupBy").value;
   const focus=document.getElementById("focusSel").value;
-  if(focus==="__all") return RAW.items;
-  return RAW.items.filter(it=>(gb==="type"?it.type:it.category)===focus);
+  let items = focus==="__all" ? RAW.items : RAW.items.filter(it=>(gb==="type"?it.type:it.category)===focus);
+  if(abcFilter!=="all") items = items.filter(it=>it.abc===abcFilter);
+  return items;
 }
 function recomputeAnalytics(items){
   // recompute pareto/abc/pva/slow for the given item subset (so focus filter works live)
@@ -897,6 +941,7 @@ document.getElementById("groupBy").onchange=()=>{document.getElementById("focusS
 document.getElementById("focusSel").onchange=renderAnalytics;
 document.getElementById("itemSearch").oninput=drawItems;
 document.querySelectorAll(".chip[data-mf]").forEach(c=>c.onclick=()=>{document.querySelectorAll(".chip[data-mf]").forEach(x=>x.classList.remove("on"));c.classList.add("on");moveFilter=c.dataset.mf;drawMovement();});
+document.querySelectorAll(".chip[data-abc]").forEach(c=>c.onclick=()=>{document.querySelectorAll(".chip[data-abc]").forEach(x=>x.classList.remove("on"));c.classList.add("on");abcFilter=c.dataset.abc;renderAnalytics();});
 document.getElementById("moveSearch").oninput=drawMovement;
 document.getElementById("moveType").onchange=drawMovement;
 document.getElementById("bomSearch").oninput=drawBOM;
