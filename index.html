@@ -249,6 +249,19 @@
       <div style="overflow:auto;max-height:380px">
         <table id="slowTable"><thead><tr><th>Code</th><th>Description</th><th class="r">Days Cover</th><th class="r">Value Locked ₹</th></tr></thead><tbody></tbody></table>
       </div></div>
+
+    <div class="panel" id="svaPanel">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+        <h3 style="border:none;margin:0;padding:0">Standard vs Actual Cost — by product</h3>
+        <select id="svaSel" class="search" style="flex:0 0 280px;cursor:pointer"></select>
+      </div>
+      <p class="sub" style="margin:6px 0 10px">Standard = what the BOM says this month's output <i>should</i> consume (BOM ratio × parts made × rate). Actual = value actually issued to the floor (issued qty × weighted-avg rate). Green = under standard (good), red = over (waste / leakage).</p>
+      <div id="svaSummary" class="cards"></div>
+      <div class="chartbox" style="height:340px"><canvas id="svaChart"></canvas></div>
+      <div style="overflow:auto;max-height:320px;margin-top:10px">
+        <table id="svaTable"><thead><tr><th>Code</th><th>Consumable</th><th class="r">Std Qty</th><th class="r">Std Cost ₹</th><th class="r">Actual Issued</th><th class="r">Actual Cost ₹</th><th class="r">Variance ₹</th><th class="r">Var %</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
   </section>
 
   <section class="page" id="ai">
@@ -316,9 +329,9 @@
   <footer>BUILT FOR SHREE PRESSING · LIVE DATA FROM GOOGLE SHEETS · VIEW-ONLY</footer>
 </main>
 <script>
-const API_URL = "https://script.google.com/macros/s/AKfycbzoIhXULnt3vI5sOYQqKVNG3LKepOKHVwfXrq0B7UFosGvgXw_8Y-MPzjCfVZBTmIxx/exec";   /* paste your Apps Script /exec URL here to go live */
+const API_URL = "https://script.google.com/macros/s/AKfycbzYynHwp6koxxo54qLAGEAYL-gx_8BQEH1CKX9xQa1a8sRL5i4txLiLIh5Ua8hj7RKO/exec";   /* paste your Apps Script /exec URL here to go live */
 let TOKEN = null;     // set after login (kept in memory only)
-let RAW=null, mode="cost", itemFilter="all", alertFilter="all", abcFilter="all", timer=null, catChart,healthChart,weekChart,paretoChart,abcChart,trendCostChart,trendQtyChart;
+let RAW=null, mode="cost", itemFilter="all", alertFilter="all", abcFilter="all", timer=null, catChart,healthChart,weekChart,paretoChart,abcChart,trendCostChart,trendQtyChart,svaChart;
 const inr=n=>"₹"+Math.round(n||0).toLocaleString("en-IN");
 const cls=s=>(s||"").replace(/\s+/g,"");
 const fmt=n=>(Math.round(n*100)/100).toLocaleString("en-IN");
@@ -395,8 +408,13 @@ function sample(){
       {month:"2026-06",label:"Jun 2026",consumption_qty:3005,consumption_cost:103900,stock_value:372000,dead_value:7000,categories:[{c:"Corrugated",q:1300,$:15600},{c:"Oils Lubricants",q:160,$:40000},{c:"Adhesive",q:420,$:18900},{c:"PPE",q:280,$:8400}]}
     ],
     manufacturing:[
-      {product:"Hero Cup",made:3060,std_cost:8200,cost_per_part:2.68,costable:2,total_lines:4,lines:[]},
-      {product:"Star City",made:3000,std_cost:6400,cost_per_part:2.13,costable:1,total_lines:3,lines:[]},
+      {product:"Hero Cup",made:3060,std_cost:8200,cost_per_part:2.68,costable:2,total_lines:4,lines:[
+        {item:"Cleaning chemical- Hiclean Ls 40",code:"CON-000022",costable:true,std_qty:110,std_cost:19800,uom:"LTR"},
+        {item:"Corrugated Box 5 Ply 370 X 210 X 130",code:"PKG-000005",costable:true,std_qty:1700,std_cost:18700,uom:"NOS"}
+      ]},
+      {product:"Star City",made:3000,std_cost:6400,cost_per_part:2.13,costable:1,total_lines:3,lines:[
+        {item:"Poly Bag 8 X 14",code:"PKG-000019",costable:true,std_qty:22,std_cost:3718,uom:"KG"}
+      ]},
       {product:"Clutch Plate 102",made:1338,std_cost:3100,cost_per_part:2.32,costable:2,total_lines:3,lines:[]},
       {product:"Yamaha Bkt",made:5000,std_cost:1200,cost_per_part:0.24,costable:3,total_lines:4,lines:[]}
     ],
@@ -572,10 +590,31 @@ function drawCat(){const cats=[...RAW.categories].sort((a,b)=>mode==="cost"?b.co
   catChart=new Chart(document.getElementById("catChart"),{type:"bar",
     data:{labels,datasets:[{data,backgroundColor:labels.map((_,i)=>pal[i%pal.length]),borderRadius:6}]},
     options:{indexAxis:"y",maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>mode==="cost"?inr(c.parsed.x):c.parsed.x+" units"}}},scales:{x:{ticks:{callback:v=>mode==="cost"?"₹"+v:v}}}}});}
+// Jump to the Items tab pre-filtered to a status. filter = "all"|"VERY LOW"|"LOW"|"OK"|"dead"
+function goItems(filter){
+  // switch nav + page
+  document.querySelectorAll("nav .tab").forEach(x=>x.classList.remove("on"));
+  document.querySelectorAll(".page").forEach(x=>x.classList.remove("on"));
+  const tab=document.querySelector('nav .tab[data-p="items"]');
+  if(tab) tab.classList.add("on");
+  document.getElementById("items").classList.add("on");
+  // set the matching filter chip
+  itemFilter=filter;
+  document.querySelectorAll('.chip[data-f]').forEach(x=>x.classList.toggle("on", x.dataset.f===filter));
+  drawItems();
+  // bring the table into view
+  document.getElementById("items").scrollIntoView({behavior:"smooth",block:"start"});
+}
 function drawHealth(){const k=RAW.kpi;if(healthChart)healthChart.destroy();
+  const segFilter=["VERY LOW","LOW","OK"]; // index matches the data array below
   healthChart=new Chart(document.getElementById("healthChart"),{type:"doughnut",
     data:{labels:["Very Low","Low","Healthy"],datasets:[{data:[k.very_low,k.low,k.ok],backgroundColor:["#c0264a","#f5a623","#0f9d58"],borderColor:"#fff",borderWidth:3}]},
-    options:{maintainAspectRatio:false,cutout:"60%",plugins:{legend:{position:"bottom"}}}});}
+    options:{maintainAspectRatio:false,cutout:"60%",
+      onHover:(e,el)=>{e.native.target.style.cursor=el.length?"pointer":"default";},
+      onClick:(e,el)=>{ if(el.length){ goItems(segFilter[el[0].index]); } },
+      plugins:{legend:{position:"bottom",
+        onClick:(e,item)=>{ goItems(segFilter[item.index]); }},  // legend label also jumps
+        tooltip:{callbacks:{footer:()=>"Click to view these items"}}}}});}
 function drawWeek(){const top=[...RAW.categories].sort((a,b)=>b.cost-a.cost).slice(0,6);
   const ds=top.map((c,i)=>({label:c.category,data:c.weeks,borderColor:pal[i%pal.length],backgroundColor:"transparent",tension:.35,borderWidth:2,pointRadius:3}));
   if(weekChart)weekChart.destroy();
@@ -907,6 +946,67 @@ function renderAnalytics(){
     const col=over==null?"":over>0?'style="color:var(--vlow);font-weight:700"':'style="color:var(--ok)"';
     return `<tr><td class="code">${r.code}</td><td>${r.desc}</td><td class="r">${fmt(r.planned)} ${r.uom}</td><td class="r">${fmt(r.actual)} ${r.uom}</td><td class="r" ${col}>${over==null?"—":(over>0?"+":"")+over+"%"}</td></tr>`;}).join(""):`<tr><td colspan=5 class="empty">Fill daily_plan in your sheet to see plan-vs-actual</td></tr>`;
   document.querySelector("#slowTable tbody").innerHTML=(a.slow_movers||[]).length?(a.slow_movers).map(r=>`<tr><td class="code">${r.code}</td><td>${r.desc}</td><td class="r">${r.days_cover} d</td><td class="r">${inr(r.value)}</td></tr>`).join(""):`<tr><td colspan=4 class="empty">No slow movers 🎉</td></tr>`;
+  renderSvA();
+}
+// ---- Standard vs Actual cost, per product ----
+function populateSvA(){
+  const sel=document.getElementById("svaSel");
+  const m=(RAW.manufacturing||[]).filter(p=>(p.lines||[]).some(l=>l.costable));
+  const cur=sel.value;
+  if(!m.length){ sel.innerHTML=`<option value="">No costable products yet</option>`; return; }
+  sel.innerHTML=m.map(p=>`<option value="${p.product}">${p.product}${p.made!=null?" — "+fmt(p.made)+" pcs":""}</option>`).join("");
+  if([...sel.options].some(o=>o.value===cur)) sel.value=cur;
+}
+function renderSvA(){
+  populateSvA();
+  const sel=document.getElementById("svaSel");
+  const m=RAW.manufacturing||[];
+  const prod=m.find(p=>p.product===sel.value) || m.find(p=>(p.lines||[]).some(l=>l.costable));
+  const byCode={}; (RAW.items||[]).forEach(i=>byCode[i.code]=i);
+  const sumEl=document.getElementById("svaSummary");
+  const tb=document.querySelector("#svaTable tbody");
+  if(!prod){ sumEl.innerHTML=""; tb.innerHTML=`<tr><td colspan=8 class="empty">Add BOM ratios (qty per N jobs), link item codes, and enter production to compare.</td></tr>`;
+    if(svaChart)svaChart.destroy(); svaChart=null; return; }
+  // build per-consumable std vs actual
+  const lines=(prod.lines||[]).filter(l=>l.costable).map(l=>{
+    const it=byCode[l.code]||{};
+    const actualCost=it.consumed_value||0, actualQty=it.issued||0;
+    const variance=actualCost-(l.std_cost||0);
+    const varPct=(l.std_cost>0)?variance/l.std_cost:null;
+    return {code:l.code,item:l.item,std_qty:l.std_qty,std_cost:l.std_cost,
+      act_qty:actualQty,act_cost:actualCost,variance,varPct,uom:l.uom};
+  }).sort((a,b)=>b.std_cost-a.std_cost);
+  const totStd=lines.reduce((s,l)=>s+l.std_cost,0);
+  const totAct=lines.reduce((s,l)=>s+l.act_cost,0);
+  const totVar=totAct-totStd;
+  sumEl.innerHTML=[
+    card("Standard Cost",inr(totStd),"BOM × output × rate","indigo","◴"),
+    card("Actual Cost",inr(totAct),"issued to floor","green","✓"),
+    card(totVar>0?"Over Standard":"Under Standard",(totVar>0?"+":"")+inr(totVar),
+      totStd>0?(Math.round(totVar/totStd*100))+"% vs standard":"",totVar>0?"red":"green",totVar>0?"▲":"▼")
+  ].join("");
+  // grouped bar: Std vs Actual per consumable
+  if(svaChart)svaChart.destroy();
+  svaChart=new Chart(document.getElementById("svaChart"),{type:"bar",
+    data:{labels:lines.map(l=>l.item.length>22?l.item.slice(0,20)+"…":l.item),
+      datasets:[
+        {label:"Standard ₹",data:lines.map(l=>Math.round(l.std_cost)),backgroundColor:"#5b5bd6",borderRadius:5},
+        {label:"Actual ₹",data:lines.map(l=>Math.round(l.act_cost)),backgroundColor:lines.map(l=>l.variance>0?"#c0264a":"#0f9d58"),borderRadius:5}
+      ]},
+    options:{maintainAspectRatio:false,plugins:{legend:{position:"bottom"},
+      tooltip:{callbacks:{label:c=>c.dataset.label+": "+inr(c.parsed.y),
+        afterBody:items=>{const l=lines[items[0].dataIndex];return l.varPct!=null?["Variance: "+(l.variance>0?"+":"")+inr(l.variance)+" ("+(l.varPct>0?"+":"")+Math.round(l.varPct*100)+"%)"]:[];}}}},
+      scales:{y:{ticks:{callback:v=>"₹"+v}}}}});
+  tb.innerHTML=lines.length?lines.map(l=>{
+    const col=l.variance>0?'style="color:var(--vlow);font-weight:700"':'style="color:var(--ok);font-weight:700"';
+    return `<tr><td class="code">${l.code}</td><td>${l.item}</td>
+      <td class="r">${l.std_qty!=null?fmt(Math.round(l.std_qty*100)/100):"—"} ${l.uom||""}</td>
+      <td class="r">${inr(l.std_cost)}</td>
+      <td class="r">${fmt(l.act_qty)} ${l.uom||""}</td>
+      <td class="r">${inr(l.act_cost)}</td>
+      <td class="r" ${col}>${l.variance>0?"+":""}${inr(l.variance)}</td>
+      <td class="r" ${col}>${l.varPct==null?"—":(l.varPct>0?"+":"")+Math.round(l.varPct*100)+"%"}</td></tr>`;
+  }).join(""):`<tr><td colspan=8 class="empty">No costable consumables for this product.</td></tr>`;
 }
 function renderAlerts(){
   const al=RAW.alerts||[];
@@ -980,6 +1080,7 @@ document.querySelectorAll(".chip[data-f]").forEach(c=>c.onclick=()=>{document.qu
 document.querySelectorAll(".chip[data-af]").forEach(c=>c.onclick=()=>{document.querySelectorAll(".chip[data-af]").forEach(x=>x.classList.remove("on"));c.classList.add("on");alertFilter=c.dataset.af;drawAlerts();});
 document.getElementById("groupBy").onchange=()=>{document.getElementById("focusSel").value="__all";renderAnalytics();};
 document.getElementById("focusSel").onchange=renderAnalytics;
+document.getElementById("svaSel").onchange=renderSvA;
 document.getElementById("itemSearch").oninput=drawItems;
 document.querySelectorAll(".chip[data-mf]").forEach(c=>c.onclick=()=>{document.querySelectorAll(".chip[data-mf]").forEach(x=>x.classList.remove("on"));c.classList.add("on");moveFilter=c.dataset.mf;drawMovement();});
 document.querySelectorAll(".chip[data-abc]").forEach(c=>c.onclick=()=>{document.querySelectorAll(".chip[data-abc]").forEach(x=>x.classList.remove("on"));c.classList.add("on");abcFilter=c.dataset.abc;renderAnalytics();});
