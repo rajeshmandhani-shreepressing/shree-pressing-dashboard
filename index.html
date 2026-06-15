@@ -111,6 +111,7 @@
   <div class="tab" data-p="prod">🏭 Production</div>
   <div class="tab" data-p="bom">🧱 BOM</div>
   <div class="tab" data-p="mfg">⚙️ Cost/Part</div>
+  <div class="tab" data-p="grn">📦 GRN Inward</div>
   <div class="tab" data-p="analytics">📊 Analytics</div>
   <div class="tab" data-p="ai" style="display:none">🤖 AI Report</div>
   <div class="tab" data-p="trends">📅 Trends</div>
@@ -222,6 +223,39 @@
       <div style="overflow:auto;max-height:300px">
         <table id="pvTable"><thead><tr><th>Item Code</th><th class="r">First Rate</th><th class="r">Latest Rate</th><th class="r">Change</th><th class="r">Deliveries</th></tr></thead><tbody></tbody></table>
       </div></div>
+  </section>
+
+  <section class="page" id="grn">
+    <h1 class="title">GRN Inward — material receipts & status</h1>
+    <p class="sub">Every inward line from the daily GRN import. Filter by status to track Approved, Released, or Rejected receipts.</p>
+    <div class="cards" id="grnCards"></div>
+    <div class="panel" id="grnRejPanel" style="display:none">
+      <h3 style="color:var(--vlow)">⚠ Rejected GRN lines — needs attention</h3>
+      <div style="overflow:auto;max-height:260px">
+        <table id="grnRejTable"><thead><tr><th>GRN No.</th><th>Code</th><th>Item</th><th class="r">Qty</th><th class="r">Value ₹</th><th>Vendor</th><th>Reason</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:6px">
+        <h3 style="border:none;margin:0;padding:0">Inward Lines</h3>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <select id="grnStatusFilter" class="search" style="flex:0 0 150px;cursor:pointer">
+            <option value="all">All statuses</option>
+            <option value="Approved">Approved</option>
+            <option value="Released">Released</option>
+            <option value="Rejected">Rejected</option>
+          </select>
+          <input id="grnSearch" class="search" placeholder="Search item / vendor / GRN…" style="flex:0 0 240px">
+        </div>
+      </div>
+      <div style="overflow:auto;max-height:520px">
+        <table id="grnTable"><thead><tr>
+          <th>Date</th><th>Status</th><th>GRN No.</th><th>Code</th><th>Item</th><th>Type</th>
+          <th class="r">Qty</th><th class="r">Rate ₹</th><th class="r">Value ₹</th><th>Vendor</th><th>Bill</th>
+        </tr></thead><tbody></tbody></table>
+      </div>
+      <p class="sub" style="font-size:12px;margin-top:6px">Status change date (if any) is tracked in the GRN LOG sheet. Rejected lines are excluded from purchase-cost totals.</p>
+    </div>
   </section>
 
   <section class="page" id="analytics">
@@ -337,7 +371,7 @@
   <footer>BUILT FOR SHREE PRESSING · LIVE DATA FROM GOOGLE SHEETS · VIEW-ONLY</footer>
 </main>
 <script>
-const API_URL = "https://script.google.com/macros/s/AKfycbxkbgK1A6L4zGg1gLUheySs--DzHnLBniqHmbFHUNOQcWmTQjyqdCXcHY20VGhmB9RX/exec";   /* paste your Apps Script /exec URL here to go live */
+const API_URL = "https://script.google.com/macros/s/AKfycbyF7o8FSC3XqstgD5rwol5DJSgL2nB3gVSHdnvvdG2JtJah7aBVRZbg2u8g1-X9_7BV/exec";   /* paste your Apps Script /exec URL here to go live */
 let TOKEN = null;     // set after login (kept in memory only)
 let RAW=null, mode="cost", itemFilter="all", alertFilter="all", abcFilter="all", timer=null, catChart,healthChart,weekChart,paretoChart,abcChart,trendCostChart,trendQtyChart,svaChart;
 const inr=n=>"₹"+Math.round(n||0).toLocaleString("en-IN");
@@ -441,7 +475,24 @@ function sample(){
       {code:"CON-000047",first:300,last:288,change_pct:-0.04,n:2}
     ],
     prev_month:{month:"2026-05",label:"May 2026",consumption_qty:2870,consumption_cost:112300,stock_value:347000,dead_value:7400,
-      categories:[{c:"Oils Lubricants",q:155,$:41200},{c:"Adhesive",q:410,$:18100},{c:"Corrugated",q:1280,$:15400},{c:"PPE",q:270,$:8000},{c:"Abrasives",q:90,$:10800}]}
+      categories:[{c:"Oils Lubricants",q:155,$:41200},{c:"Adhesive",q:410,$:18100},{c:"Corrugated",q:1280,$:15400},{c:"PPE",q:270,$:8000},{c:"Abrasives",q:90,$:10800}]},
+    grn_status:{
+      by_status:{Approved:19,Released:3,Rejected:2},
+      by_type:[{type:"Consumables",lines:14,value:286400},{type:"Packing Material",lines:3,value:54100},{type:"Maintenance Items",lines:4,value:59000},{type:"Stationery",lines:1,value:1200}],
+      inward_this_month:341700, lines_this_month:17, total_lines:24,
+      rejected:[
+        {grn:"GRN/SP L15/0626/000690",code:"CON-000213",name:"Grinding Wheel",qty:5,uom:"GMS",value:15300,vendor:"Chandrakant Shah & Sons",reason:"Size mismatch vs PO"},
+        {grn:"GRN/SP L15/0626/000692",code:"CN000122",name:"Welding glass – Black",qty:20,uom:"KGS",value:360,vendor:"Soham Traders",reason:""}
+      ],
+      recent:[
+        {date:"2026-06-15",grn:"GRN/SP L15/0626/000700",code:"CN000097",name:"Co2 Welding Wire- 1.2 MM",type:"Consumables",status:"Approved",qty:500,uom:"KGS",rate:110,amount:55000,vendor:"Selwel Enterprises Pvt. Ltd.",bill:""},
+        {date:"2026-06-13",grn:"GRN/SP L15/0626/000698",code:"CON-000003",name:"Polishing Belt 2000X150 -320 Grit",type:"Consumables",status:"Released",qty:100,uom:"NOS",rate:213.75,amount:21375,vendor:"Flexible Abrasives Pvt. Ltd.",bill:"FAS01858/26",changed:"2026-06-14"},
+        {date:"2026-06-13",grn:"GRN/SP L15/0626/000692",code:"CN000122",name:"Welding glass – Black",type:"Consumables",status:"Rejected",qty:20,uom:"KGS",rate:18,amount:360,vendor:"Soham Traders",bill:"331/26-27",changed:"2026-06-14"},
+        {date:"2026-06-12",grn:"GRN/SP L15/0626/000688",code:"CN000102",name:"Anti-Rust Oil (Bajaj)",type:"Consumables",status:"Approved",qty:209,uom:"KGS",rate:180,amount:37620,vendor:"Apar Industries Ltd.",bill:"9612335487"},
+        {date:"2026-06-11",grn:"GRN/SP L15/0626/000674",code:"CON-000047",name:"Oil - Deep Draw- 300",type:"Consumables",status:"Approved",qty:210,uom:"LTR",rate:240,amount:50400,vendor:"Shree Siddhivinayak Enterprises",bill:"SSE2627204"},
+        {date:"2026-06-11",grn:"GRN/SP L15/0626/000679",code:"CN000057",name:"Cotton Waste",type:"Consumables",status:"Approved",qty:100,uom:"KGS",rate:32,amount:3200,vendor:"Shree Ram And Co",bill:""}
+      ]
+    }
     };
 }
 function buildSampleAlerts(items){const out=[];const r1=x=>Math.round(x*10)/10;
@@ -511,7 +562,7 @@ function setStatus(s){const d=document.getElementById("dot"),t=document.getEleme
   d.className="live-dot"+(s==="live"?" on":"");
   t.textContent=s==="live"?"Live":(s==="loading"?"Loading…":(s==="error"?"Offline — sample":"Sample data"));}
 function renderAll(){document.getElementById("updated").textContent=new Date(RAW.updated).toLocaleTimeString("en-IN");
-  renderDash();renderItems();renderProd();renderAnalytics();renderAlerts();renderTrends();renderMovement();renderBOM();renderMfg();}
+  renderDash();renderItems();renderProd();renderAnalytics();renderAlerts();renderTrends();renderMovement();renderBOM();renderMfg();renderGrn();}
 function card(lab,big,note,kind,ic){return `<div class="c ${kind||''}"><div class="lab">${lab}</div><div class="big">${big}</div>${note?`<div class="note">${note}</div>`:""}<div class="ic">${ic||''}</div></div>`;}
 function renderDash(){
   const k=RAW.kpi;
@@ -880,18 +931,102 @@ RULES:
   }
   btn.disabled=false;
 }
+// ===== GRN Inward =====
+function renderGrn(){
+  const g=RAW.grn_status;
+  if(!g){
+    document.getElementById("grnCards").innerHTML=card("GRN Inward","Not set up","Import a GRN file to begin","","📦");
+    document.querySelector("#grnTable tbody").innerHTML=`<tr><td colspan=11 class="empty">No GRN LOG yet. Use the GRN menu in the sheet → Import GRN now.</td></tr>`;
+    document.getElementById("grnRejPanel").style.display="none";
+    return;
+  }
+  const st=g.by_status||{};
+  const appr=st["Approved"]||0, rel=st["Released"]||0, rej=st["Rejected"]||0;
+  document.getElementById("grnCards").innerHTML=[
+    card("Inward This Month","₹"+fmt(Math.round(g.inward_this_month||0)),(g.lines_this_month||0)+" approved lines","indigo","₹"),
+    card("Approved",appr+"","lines received OK","green","✓"),
+    card("Released",rel+"","awaiting approval","amber","⏳"),
+    card("Rejected",rej+"",rej?"check reasons":"none 🎉",rej?"red":"green","⚠")
+  ].join("");
+  const rejRows=g.rejected||[];
+  document.getElementById("grnRejPanel").style.display=rejRows.length?"block":"none";
+  if(rejRows.length){
+    document.querySelector("#grnRejTable tbody").innerHTML=rejRows.map(r=>`<tr>
+      <td class="code">${r.grn||""}</td><td class="code">${r.code||""}</td><td>${r.name||""}</td>
+      <td class="r">${fmt(r.qty)} ${r.uom||""}</td><td class="r">${inr(r.value)}</td>
+      <td>${r.vendor||""}</td><td>${r.reason||'<span style="color:var(--mut)">—</span>'}</td></tr>`).join("");
+  }
+  drawGrnTable();
+}
+function drawGrnTable(){
+  const g=RAW.grn_status; if(!g) return;
+  const rows=g.recent||[];
+  const sf=document.getElementById("grnStatusFilter").value;
+  const q=(document.getElementById("grnSearch").value||"").toLowerCase();
+  const filtered=rows.filter(r=>{
+    if(sf!=="all" && (""+r.status)!==sf) return false;
+    if(q && !((r.name+" "+r.vendor+" "+r.grn+" "+r.code).toLowerCase().includes(q))) return false;
+    return true;
+  });
+  const statusPill=s=>{
+    const m={Approved:["#0f9d58","#D9EAD3"],Rejected:["#c0264a","#F4CCCC"],Released:["#b8860b","#FFF2CC"]};
+    const c=m[s]||["#666","#eee"];
+    return `<span class="pill" style="background:${c[1]};color:${c[0]};font-weight:700;font-size:11px">${s||"—"}</span>`;
+  };
+  document.querySelector("#grnTable tbody").innerHTML=filtered.length?filtered.map(r=>`<tr>
+    <td>${r.date?new Date(r.date).toLocaleDateString("en-IN",{day:"2-digit",month:"short"}):"—"}</td>
+    <td>${statusPill(r.status)}${r.changed?'<span title="status changed" style="color:var(--mut)"> *</span>':''}</td>
+    <td class="code" style="font-size:11px">${r.grn||""}</td>
+    <td class="code">${r.code||""}</td>
+    <td>${r.name||""}</td>
+    <td style="font-size:11px;color:var(--mut)">${r.type||""}</td>
+    <td class="r">${fmt(r.qty)} ${r.uom||""}</td>
+    <td class="r">₹${r2(r.rate)}</td>
+    <td class="r">${inr(r.amount)}</td>
+    <td style="font-size:12px">${r.vendor||""}</td>
+    <td style="font-size:11px;color:var(--mut)">${r.bill||""}</td></tr>`).join("")
+    :`<tr><td colspan=11 class="empty">No lines match this filter.</td></tr>`;
+}
 let mfgSel=null;
+// Parse "3000 jobs", "5 jobs", "204 boxes", "20 pieces", "1 job" -> the number.
+// Anything without a number ("month","as per usage","day","manpower") -> null (not per-piece).
+function perNum(per){ if(per==null) return null; var m=(""+per).match(/(\d[\d,\.]*)/); if(!m) return null; var n=parseFloat(m[1].replace(/,/g,"")); return isNaN(n)?null:n; }
+function r2(n){ return (Math.round((n||0)*100)/100).toLocaleString("en-IN"); }
+function p4(n){ return "₹"+(Math.round((n||0)*10000)/10000).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:4}); }
+
+// Build per-piece costing for every product directly from RAW.bom (qty,per,rate).
+// No production needed. cost/piece for a line = qty / perNum(per) * rate.
+function mfgProducts(){
+  const bom=RAW.bom||[];
+  const byCode={}; (RAW.items||[]).forEach(i=>byCode[i.code]=i);
+  const map={};
+  bom.forEach(b=>{
+    const prod=(b.product||"").trim(); if(!prod) return;
+    if(!map[prod]) map[prod]={product:prod, cell:b.cell||"", dept:b.dept||"", total:0, costed:0, cpp:0, lines:[]};
+    const P=map[prod]; P.total++;
+    const qty=parseFloat(b.qty)||0;
+    // rate: prefer BOM-provided rate, else look up the item's weighted-avg rate by code
+    let rate=(b.rate!=null)?parseFloat(b.rate):null;
+    if((rate==null||isNaN(rate)) && b.code && byCode[b.code]) rate=byCode[b.code].rate;
+    const pn=perNum(b.per);
+    let cpp=null, costable=false;
+    if(pn>0 && qty>0 && rate>0){ cpp=(qty/pn)*rate; costable=true; P.cpp+=cpp; P.costed++; }
+    P.lines.push({code:b.code||"", item:b.item, qty:qty, uom:b.uom||"", per:b.per||"", rate:(rate>0?rate:null), cpp:cpp, costable:costable});
+  });
+  const arr=Object.keys(map).map(k=>{ const P=map[k]; P.cost_per_piece=P.costed>0?P.cpp:null; return P; });
+  arr.sort((a,b)=>(b.cost_per_piece||0)-(a.cost_per_piece||0));
+  return arr;
+}
 function renderMfg(){
-  const m=RAW.manufacturing||[];
+  const m=mfgProducts();
   const pv=RAW.price_variance||[];
-  const withCpp=m.filter(p=>p.cost_per_piece_full!=null||p.cost_per_part!=null);
-  const priciest=withCpp.slice().sort((a,b)=>(b.cost_per_piece_full||b.cost_per_part||0)-(a.cost_per_piece_full||a.cost_per_part||0))[0];
-  const totMonth=m.reduce((s,p)=>s+(p.full_cost||p.std_cost||0),0);
+  const costed=m.filter(p=>p.cost_per_piece!=null);
+  const priciest=costed[0];
   document.getElementById("mfgCards").innerHTML=[
-    card("Parts Costed",withCpp.length+" / "+m.length,"need production + rates","","⚙️"),
-    card("Total Consumable Cost",inr(totMonth),"this month, all parts","indigo","₹"),
-    card("Priciest Part",priciest?priciest.product:"—",priciest?("₹"+r2(priciest.cost_per_piece_full||priciest.cost_per_part)+"/pc"):"add data","amber","▲"),
-    card("Avg Cost / Piece",withCpp.length?("₹"+r2(withCpp.reduce((s,p)=>s+(p.cost_per_piece_full||p.cost_per_part||0),0)/withCpp.length)):"—","across costed parts","green","÷")
+    card("Parts in BOM",m.length+"","products tracked","","🧱"),
+    card("Parts Costed",costed.length+" / "+m.length,"have ratio + rate","indigo","✓"),
+    card("Priciest Part",priciest?priciest.product:"—",priciest?("₹"+r2(priciest.cost_per_piece)+"/pc"):"add data","amber","▲"),
+    card("Avg Cost / Piece",costed.length?("₹"+r2(costed.reduce((s,p)=>s+p.cost_per_piece,0)/costed.length)):"—","across costed parts","green","÷")
   ].join("");
   drawMfgTable();
   document.querySelector("#pvTable tbody").innerHTML = pv.length? pv.map(v=>{
@@ -899,42 +1034,38 @@ function renderMfg(){
     return `<tr><td class="code">${v.code}</td><td class="r">₹${fmt(v.first)}</td><td class="r">₹${fmt(v.last)}</td>
       <td class="r" ${col}>${up?"▲ ":"▼ "}${Math.abs(Math.round(v.change_pct*100))}%</td><td class="r">${v.n}</td></tr>`;}).join("")
     : `<tr><td colspan=5 class="empty">Need 2+ dated entries per item in RATE LOG to show price drift.</td></tr>`;
-  // keep an open detail in sync after refresh
   if(mfgSel){ const still=m.find(p=>p.product===mfgSel); if(still) showMfgDetail(mfgSel); }
 }
-function r2(n){ return (Math.round((n||0)*100)/100).toLocaleString("en-IN"); }
 function drawMfgTable(){
-  const m=RAW.manufacturing||[];
+  const m=mfgProducts();
   const q=(document.getElementById("mfgSearch").value||"").toLowerCase();
   const rows=m.filter(p=>!q||(p.product+" "+(p.cell||"")).toLowerCase().includes(q));
   document.querySelector("#mfgTable tbody").innerHTML = rows.length? rows.map(p=>{
-    const cpp=p.cost_per_piece_full!=null?p.cost_per_piece_full:p.cost_per_part;
+    const uncosted=p.total-p.costed;
     return `<tr style="cursor:pointer" onclick="showMfgDetail('${p.product.replace(/'/g,"\\'")}')">
       <td><b>${p.product}</b></td>
       <td style="color:var(--mut);font-size:12px">${p.cell||""}</td>
-      <td class="r">${cpp!=null?'<b style="color:var(--indigo)">₹'+r2(cpp)+'</b>':"—"}</td>
-      <td class="r">${p.costable}/${p.total_lines}${p.uncosted_lines?'<span title="'+p.uncosted_lines+' line(s) need a ratio/rate" style="color:var(--low)"> ⚠</span>':''}</td>
+      <td class="r">${p.cost_per_piece!=null?'<b style="color:var(--indigo)">₹'+r2(p.cost_per_piece)+'</b>':"—"}</td>
+      <td class="r">${p.costed}/${p.total}${uncosted?'<span title="'+uncosted+' line(s) need a ratio/rate" style="color:var(--low)"> ⚠</span>':''}</td>
       <td class="r" style="color:var(--indigo);font-size:12px">view ▸</td></tr>`;}).join("")
     : `<tr><td colspan=5 class="empty">No parts match. Add BOM ratios (qty per N jobs) + rates.</td></tr>`;
 }
 function showMfgDetail(product){
   mfgSel=product;
-  const p=(RAW.manufacturing||[]).find(x=>x.product===product);
+  const p=mfgProducts().find(x=>x.product===product);
   const el=document.getElementById("mfgDetail");
   if(!p){ el.style.display="none"; return; }
   el.style.display="block";
-  const order={direct:0,allocated:1,uncosted:2};
-  const lines=(p.lines||[]).slice().sort((a,b)=>(order[a.method]-order[b.method])||((b.cost_per_piece||0)-(a.cost_per_piece||0)));
-  const total=p.cost_per_piece_full!=null?p.cost_per_piece_full:(p.cost_per_part||null);
-  const p4=n=>"₹"+(Math.round((n||0)*10000)/10000).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:4});
+  const lines=p.lines.slice().sort((a,b)=>(b.cpp||0)-(a.cpp||0));
+  const uncosted=p.total-p.costed;
   const rowsHtml=lines.map(l=>{
-    const ratio=(l.method==="direct"&&l.qty!=null)?`${fmt(l.qty)} ${l.uom||""} per ${l.per}`:(l.per||"—");
+    const usage=(perNum(l.per)>0 && l.qty>0)?`${fmt(l.qty)} ${l.uom||""} per ${l.per}`:(l.per||"—");
     return `<tr>
       <td class="code">${l.code||"—"}</td>
       <td>${l.item}</td>
-      <td style="color:var(--mut);font-size:12px">${ratio}</td>
+      <td style="color:var(--mut);font-size:12px">${usage}</td>
       <td class="r">${l.rate!=null?"₹"+r2(l.rate):"—"}</td>
-      <td class="r">${l.cost_per_piece!=null?"<b>"+p4(l.cost_per_piece)+"</b>":'<span style="color:var(--low)">add data</span>'}</td></tr>`;
+      <td class="r">${l.cpp!=null?"<b>"+p4(l.cpp)+"</b>":'<span style="color:var(--low)">add ratio/rate</span>'}</td></tr>`;
   }).join("");
   el.innerHTML=`
     <div class="noprint" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px">
@@ -961,10 +1092,10 @@ function showMfgDetail(product){
         <tbody>${rowsHtml||`<tr><td colspan=5 style="padding:14px;text-align:center;color:#999">No lines.</td></tr>`}</tbody>
         <tfoot><tr style="background:#eef0fb;border-top:2px solid #1F4E78">
           <td colspan=4 style="padding:11px 8px;text-align:right;font-size:15px;font-weight:800;color:#1F4E78">TOTAL COST PER PIECE</td>
-          <td style="padding:11px 8px;text-align:right;font-size:17px;font-weight:800;color:#1F4E78">${total!=null?p4(total):"—"}</td>
+          <td style="padding:11px 8px;text-align:right;font-size:17px;font-weight:800;color:#1F4E78">${p.cost_per_piece!=null?p4(p.cost_per_piece):"—"}</td>
         </tr></tfoot>
       </table>
-      ${p.uncosted_lines?`<div style="font-size:11px;color:#b8860b;margin-top:9px">⚠ ${p.uncosted_lines} line(s) marked "add data" are not in the total — add a ratio (qty per N jobs) or a rate to include them.</div>`:""}
+      ${uncosted?`<div style="font-size:11px;color:#b8860b;margin-top:9px">⚠ ${uncosted} line(s) need a ratio (qty per N jobs) or a rate to be included in the total.</div>`:""}
     </div>`;
   el.scrollIntoView({behavior:"smooth",block:"nearest"});
 }
@@ -1180,6 +1311,8 @@ document.getElementById("bomSearch").oninput=drawBOM;
 document.getElementById("aiQ").addEventListener("keydown",e=>{if((e.ctrlKey||e.metaKey)&&e.key==="Enter")askAI();});
 document.getElementById("bomView").onchange=drawBOM;
 document.getElementById("mfgSearch").oninput=drawMfgTable;
+document.getElementById("grnStatusFilter").onchange=drawGrnTable;
+document.getElementById("grnSearch").oninput=drawGrnTable;
 document.getElementById("auto").onchange=e=>{if(e.target.checked)startAuto();else clearInterval(timer);};
 function startAuto(){clearInterval(timer);timer=setInterval(load,10000);}
 document.getElementById("loginBtn").onclick=doLogin;
