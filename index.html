@@ -103,8 +103,37 @@
     <p id="loginErr" style="color:#c0264a;font-size:13px;margin-top:12px;min-height:18px;text-align:center"></p>
   </div>
 </div>
+<!-- ===================== PORTAL LANDING ===================== -->
+<div id="portal" style="display:none;position:fixed;inset:0;z-index:900;background:linear-gradient(135deg,#1f2733,#0e1116);overflow:auto">
+  <div style="max-width:880px;margin:0 auto;padding:60px 24px 40px;text-align:center;color:#fff">
+    <div style="height:5px;width:90px;background:linear-gradient(90deg,#f5a623,#f7c34a);border-radius:5px;margin:0 auto 26px"></div>
+    <h1 style="font-size:30px;font-weight:800;letter-spacing:-0.02em">SHREE PRESSING</h1>
+    <p style="color:#9aa3b2;margin:8px 0 4px;font-size:15px">Inventory Management Portal</p>
+    <p id="portalWho" style="color:#6f7888;font-size:13px;margin-bottom:40px"></p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:22px">
+      <div class="portalCard" data-go="rm" style="background:#fff;border-radius:18px;padding:34px 28px;cursor:pointer;text-align:left;transition:transform .15s,box-shadow .15s;box-shadow:0 10px 30px rgba(0,0,0,.25)">
+        <div style="width:56px;height:56px;border-radius:14px;background:#eef0fb;display:flex;align-items:center;justify-content:center;font-size:28px;margin-bottom:18px">🪨</div>
+        <h2 style="color:#1a1f29;font-size:21px;font-weight:800">RM IMS Dashboard</h2>
+        <p style="color:#7b8494;font-size:14px;margin-top:8px;line-height:1.5">Raw material stock — SS, HR, CRCA, coils & sheets. Coverage days, schedule gaps, reorder.</p>
+        <div style="margin-top:18px;display:flex;align-items:center;gap:6px;color:#5b5bd6;font-weight:700;font-size:14px">Open RM dashboard →</div>
+      </div>
+      <div class="portalCard" data-go="cons" style="background:#fff;border-radius:18px;padding:34px 28px;cursor:pointer;text-align:left;transition:transform .15s,box-shadow .15s;box-shadow:0 10px 30px rgba(0,0,0,.25)">
+        <div style="width:56px;height:56px;border-radius:14px;background:#fdf6e3;display:flex;align-items:center;justify-content:center;font-size:28px;margin-bottom:18px">🧴</div>
+        <h2 style="color:#1a1f29;font-size:21px;font-weight:800">Consumable IMS Dashboard</h2>
+        <p style="color:#7b8494;font-size:14px;margin-top:8px;line-height:1.5">Oils, packaging, abrasives, PPE. Cost per part, BOM, GRN inward, rate tracking.</p>
+        <div style="margin-top:18px;display:flex;align-items:center;gap:6px;color:#f5a623;font-weight:700;font-size:14px">Open consumable dashboard →</div>
+      </div>
+    </div>
+    <button id="portalLogout" style="margin-top:36px;background:transparent;border:1px solid #3a414e;color:#9aa3b2;padding:9px 20px;border-radius:10px;cursor:pointer;font-weight:600">Logout</button>
+  </div>
+</div>
+<style>.portalCard:hover{transform:translateY(-4px);box-shadow:0 18px 44px rgba(0,0,0,.35)!important}</style>
+
+<!-- ===================== CONSUMABLE APP (unchanged) ===================== -->
+<div id="consApp" style="display:none">
 <div class="topbar"></div>
 <nav>
+  <div class="tab" data-portal="1" style="font-weight:800;color:var(--indigo)">⮜ Portal</div>
   <div class="tab on" data-p="dash">📈 Dashboard</div>
   <div class="tab" data-p="items">🧩 Items</div>
   <div class="tab" data-p="movement">🔁 Movement</div>
@@ -370,9 +399,133 @@
   </section>
   <footer>BUILT FOR SHREE PRESSING · LIVE DATA FROM GOOGLE SHEETS · VIEW-ONLY</footer>
 </main>
+</div><!-- /consApp -->
+
+<!-- ===================== RM-IMS APP ===================== -->
+<div id="rmApp" style="display:none">
+<div class="topbar" style="background:linear-gradient(90deg,#5b5bd6,#7b7be0)"></div>
+<nav>
+  <div class="tab" data-portal="1" style="font-weight:800;color:var(--indigo)">⮜ Portal</div>
+  <div class="tab on" data-rp="rdash">📈 Dashboard</div>
+  <div class="tab" data-rp="ritems">🪨 Materials</div>
+  <div class="tab" data-rp="rmove">🔁 Movement</div>
+  <div class="tab" data-rp="rsched">📅 Schedule vs Stock</div>
+  <div class="tab" data-rp="rcust">🏷 By Customer</div>
+  <div class="tab" data-rp="ranalytics">📊 Analytics</div>
+  <div class="tab" data-rp="ralerts">🔔 Alerts <span class="navbadge" id="rmAlertBadge" style="display:none">0</span></div>
+  <div class="spacer">
+    <span><span class="live-dot" id="rdot"></span><span id="rstatustext">Loading…</span></span>
+    <label style="cursor:pointer"><input type="checkbox" id="rauto" checked> Auto-refresh 10s</label>
+    <span id="rupdated"></span>
+    <span id="rwhoami" style="font-weight:700;color:var(--ink)"></span>
+    <button class="btn" id="rlogoutBtn" style="padding:6px 12px">Logout</button>
+  </div>
+</nav>
+<main>
+  <section class="page on" id="rdash">
+    <div class="cards" id="rkpiTop"></div>
+    <div class="cards" id="rkpiMid"></div>
+    <div class="bannerstack" id="rbannerStack"></div>
+    <div class="panel"><h3>REORDER NOW — material below reorder line (soonest to run out first)</h3>
+      <div style="overflow:auto;max-height:430px">
+        <table id="rReorderTable"><thead><tr><th>SKU</th><th>Material</th><th class="r">Closing</th><th class="r">Reorder Line</th><th class="r">Days Cover</th><th class="r">Suggest Order</th><th>For Customer</th></tr></thead><tbody></tbody></table>
+      </div></div>
+    <div class="grid2">
+      <div class="panel"><h3>Stock Value by Material Grade</h3><div class="chartbox"><canvas id="rGradeChart"></canvas></div></div>
+      <div class="panel"><h3>Stock Health</h3><div class="chartbox"><canvas id="rHealthChart"></canvas></div></div>
+    </div>
+    <div class="panel"><h3>Capital Tied Up by Grade (₹)</h3><div class="chartbox"><canvas id="rGradeBar"></canvas></div></div>
+  </section>
+
+  <section class="page" id="ritems">
+    <h1 class="title">Raw Material Master</h1>
+    <p class="sub" id="rItemsSub">materials total — filter and search to focus</p>
+    <div class="filters">
+      <div class="chip on" data-rf="all">All <span class="b" id="rcAll">0</span></div>
+      <div class="chip" data-rf="VERY LOW">Very Low <span class="b" id="rcVL">0</span></div>
+      <div class="chip" data-rf="LOW">Low <span class="b" id="rcLO">0</span></div>
+      <div class="chip" data-rf="OK">Healthy <span class="b" id="rcOK">0</span></div>
+      <div class="chip" data-rf="over">Overstock <span class="b" id="rcOV">0</span></div>
+      <div class="chip" data-rf="dead">Dead <span class="b" id="rcDS">0</span></div>
+      <input class="search" id="rItemSearch" placeholder="Search SKU, material, customer, where used…">
+    </div>
+    <div class="panel"><div style="overflow:auto;max-height:620px">
+      <table id="rItemsTable"><thead><tr><th>SKU</th><th>Material</th><th>UOM</th><th class="r">Rate ₹</th><th class="r">Received</th><th class="r">Issued</th><th class="r">Closing</th><th class="r">In Transit</th><th class="r">Stock Value ₹</th><th class="r">ADC</th><th class="r">Days Cover</th><th class="r">Reorder Line</th><th>Status</th><th>ABC</th></tr></thead><tbody></tbody></table>
+    </div></div>
+  </section>
+
+  <section class="page" id="rmove">
+    <h1 class="title">Movement — Daily In / Out</h1>
+    <p class="sub">Day-by-day receipts (IN) and issues (OUT) per material. Green = received · Red = issued.</p>
+    <div class="filters">
+      <div class="chip on" data-rmf="all">All <span class="b" id="rmAll">0</span></div>
+      <div class="chip" data-rmf="moved">Only moved <span class="b" id="rmMoved">0</span></div>
+      <input class="search" id="rMoveSearch" placeholder="Search SKU or material…">
+      <select id="rMoveType" class="search" style="flex:0 0 160px;cursor:pointer">
+        <option value="both">IN &amp; OUT</option><option value="out">OUT only</option><option value="in">IN only</option>
+      </select>
+    </div>
+    <div class="panel"><div style="overflow:auto;max-height:620px">
+      <table id="rMoveTable" style="font-size:12px"><thead id="rMoveHead"></thead><tbody></tbody></table>
+    </div></div>
+  </section>
+
+  <section class="page" id="rsched">
+    <h1 class="title">Schedule vs Stock — can we meet the plan?</h1>
+    <p class="sub">This month's RM requirement (from Monthly Schedule) against what's available (closing + in-transit). Red = short.</p>
+    <div class="filters">
+      <div class="chip on" data-rsf="all">All planned <span class="b" id="rsAll">0</span></div>
+      <div class="chip" data-rsf="short">Short only <span class="b" id="rsShort">0</span></div>
+      <input class="search" id="rSchedSearch" placeholder="Search SKU or material…">
+    </div>
+    <div class="panel"><div style="overflow:auto;max-height:640px">
+      <table id="rSchedTable"><thead><tr><th>SKU</th><th>Material</th><th class="r">Required (mo)</th><th class="r">Closing</th><th class="r">In Transit</th><th class="r">Available</th><th class="r">Gap</th><th>Verdict</th></tr></thead><tbody></tbody></table>
+    </div></div>
+  </section>
+
+  <section class="page" id="rcust">
+    <h1 class="title">By Customer — RM demand this month</h1>
+    <p class="sub">Where the raw material is going: each customer's finished-goods schedule and the RM kilograms it pulls.</p>
+    <div class="panel"><div style="overflow:auto;max-height:640px">
+      <table id="rCustTable"><thead><tr><th>Customer</th><th class="r">FG Lines</th><th class="r">Schedule (Nos)</th><th class="r">RM Required (Kg)</th><th class="r">Share</th></tr></thead><tbody></tbody></table>
+    </div></div>
+  </section>
+
+  <section class="page" id="ranalytics">
+    <h1 class="title">Analytics</h1>
+    <p class="sub">ABC by capital tied up, top value concentration, and slow-moving stock.</p>
+    <div class="cards" id="rAbcCards"></div>
+    <div class="grid2">
+      <div class="panel"><h3>Value Concentration (Pareto) — top materials by stock value</h3><div class="chartbox"><canvas id="rParetoChart"></canvas></div></div>
+      <div class="panel"><h3>ABC Split</h3><div class="chartbox"><canvas id="rAbcChart"></canvas></div></div>
+    </div>
+    <div class="panel"><h3>Slow Movers — 60+ days cover, capital sitting idle</h3>
+      <div style="overflow:auto;max-height:420px">
+        <table id="rSlowTable"><thead><tr><th>SKU</th><th>Material</th><th class="r">Days Cover</th><th class="r">Value Locked ₹</th></tr></thead><tbody></tbody></table>
+      </div></div>
+  </section>
+
+  <section class="page" id="ralerts">
+    <h1 class="title">Alerts</h1>
+    <p class="sub">Everything that needs attention, most serious first.</p>
+    <div class="filters">
+      <div class="chip on" data-raf="all">All <span class="b" id="raAll">0</span></div>
+      <div class="chip" data-raf="critical">Critical <span class="b" id="raCrit">0</span></div>
+      <div class="chip" data-raf="warn">Warning <span class="b" id="raWarn">0</span></div>
+      <div class="chip" data-raf="info">Info <span class="b" id="raInfo">0</span></div>
+    </div>
+    <div class="panel" id="rAlertList"></div>
+  </section>
+
+  <footer>BUILT FOR SHREE PRESSING · RAW MATERIAL IMS · LIVE DATA · VIEW-ONLY</footer>
+</main>
+</div><!-- /rmApp -->
 <script>
-const API_URL = "https://script.google.com/macros/s/AKfycbyF7o8FSC3XqstgD5rwol5DJSgL2nB3gVSHdnvvdG2JtJah7aBVRZbg2u8g1-X9_7BV/exec";   /* paste your Apps Script /exec URL here to go live */
-let TOKEN = null;     // set after login (kept in memory only)
+const API_URL = "https://script.google.com/macros/s/AKfycbyF7o8FSC3XqstgD5rwol5DJSgL2nB3gVSHdnvvdG2JtJah7aBVRZbg2u8g1-X9_7BV/exec";   /* consumable Apps Script /exec URL */
+const RM_API_URL = "https://script.google.com/macros/s/AKfycbx3CU7t8VR6bv2CezlXTH5mWKAWoGyZcjJ-mO6UXNSxFAzc6E6DUj19k6rcqFtdso2sBw/exec";   /* paste the RM-IMS Apps Script /exec URL here to go live (deploy RM_IMS_Dashboard_Code.gs on the RM sheet) */
+let TOKEN = null;     // set after login (kept in memory only); shared by BOTH dashboards
+let RM_RAW=null, rmTimer=null, rItemFilter="all", rMoveFilter="all", rSchedFilter="all", rAlertFilter="all";
+let rGradeChart,rHealthChart,rGradeBar,rParetoChart,rAbcChart;
 let RAW=null, mode="cost", itemFilter="all", alertFilter="all", abcFilter="all", timer=null, catChart,healthChart,weekChart,paretoChart,abcChart,trendCostChart,trendQtyChart,svaChart;
 const inr=n=>"₹"+Math.round(n||0).toLocaleString("en-IN");
 const cls=s=>(s||"").replace(/\s+/g,"");
@@ -537,12 +690,37 @@ async function doLogin(){
 function afterLogin(user){
   document.getElementById("loginScreen").style.display="none";
   document.getElementById("whoami").textContent="👤 "+user;
-  startAuto(); load();
+  document.getElementById("rwhoami").textContent="👤 "+user;
+  document.getElementById("portalWho").textContent="Signed in as "+user+" · choose a dashboard";
+  showPortal();
+}
+function showPortal(){
+  clearInterval(timer); clearInterval(rmTimer);
+  document.getElementById("portal").style.display="block";
+  document.getElementById("consApp").style.display="none";
+  document.getElementById("rmApp").style.display="none";
+}
+function openDashboard(which){
+  document.getElementById("portal").style.display="none";
+  if(which==="cons"){
+    document.getElementById("consApp").style.display="block";
+    document.getElementById("rmApp").style.display="none";
+    if(document.getElementById("auto").checked) startAuto();
+    load();
+  } else {
+    document.getElementById("rmApp").style.display="block";
+    document.getElementById("consApp").style.display="none";
+    if(document.getElementById("rauto").checked) startRmAuto();
+    rmLoad();
+  }
 }
 function logout(){
-  TOKEN=null; clearInterval(timer);
+  TOKEN=null; clearInterval(timer); clearInterval(rmTimer);
   document.getElementById("loginPass").value="";
   document.getElementById("loginErr").textContent="";
+  document.getElementById("portal").style.display="none";
+  document.getElementById("consApp").style.display="none";
+  document.getElementById("rmApp").style.display="none";
   document.getElementById("loginScreen").style.display="flex";
 }
 async function load(){
@@ -661,9 +839,9 @@ function drawCat(){const cats=[...RAW.categories].sort((a,b)=>mode==="cost"?b.co
 // Jump to the Items tab pre-filtered to a status. filter = "all"|"VERY LOW"|"LOW"|"OK"|"dead"
 function goItems(filter){
   // switch nav + page
-  document.querySelectorAll("nav .tab").forEach(x=>x.classList.remove("on"));
-  document.querySelectorAll(".page").forEach(x=>x.classList.remove("on"));
-  const tab=document.querySelector('nav .tab[data-p="items"]');
+  document.querySelectorAll("#consApp nav .tab").forEach(x=>x.classList.remove("on"));
+  document.querySelectorAll("#consApp .page").forEach(x=>x.classList.remove("on"));
+  const tab=document.querySelector('#consApp nav .tab[data-p="items"]');
   if(tab) tab.classList.add("on");
   document.getElementById("items").classList.add("on");
   // set the matching filter chip
@@ -1296,7 +1474,286 @@ function downloadCSV(){const rows=[["code","description","uom","closing","min","
   const csv=rows.map(r=>r.map(x=>`"${(""+x).replace(/"/g,'""')}"`).join(",")).join("\n");
   const b=new Blob([csv],{type:"text/csv"}),u=URL.createObjectURL(b),a=document.createElement("a");
   a.href=u;a.download="shree_pressing_stock_"+new Date().toISOString().slice(0,10)+".csv";a.click();URL.revokeObjectURL(u);}
-document.querySelectorAll("nav .tab").forEach(t=>t.onclick=()=>{document.querySelectorAll("nav .tab").forEach(x=>x.classList.remove("on"));document.querySelectorAll(".page").forEach(x=>x.classList.remove("on"));t.classList.add("on");document.getElementById(t.dataset.p).classList.add("on");});
+/* ============================================================
+   RM-IMS MODULE — sample data, load, and all renderers
+   ============================================================ */
+function rmSample(){
+  const mk=(sku,name,grade,rate,closing,maxL,adc,lead,moq,inS,outS,transit,cust,fg,planned)=>{
+    const received=inS.reduce((a,b)=>a+b,0), issued=outS.reduce((a,b)=>a+b,0);
+    const reorder=Math.round(adc*lead);
+    const cover=adc>0?closing/adc:null;
+    const status=closing<=0?"VERY LOW":(closing<=reorder?(closing<=moq?"VERY LOW":"LOW"):"OK");
+    const over=maxL>0&&closing>maxL*1.25;
+    return {code:sku,desc:name,system_name:name,category:grade,type:grade,uom:"Kgs",
+      rate,master_rate:rate,latest_rate:rate,opening:closing+issued-received,received,issued,closing,
+      in_transit:transit,stock_value:closing*rate,consumed_value:issued*rate,
+      min:moq,max:maxL,reorder_point:reorder,moq,lead_time:lead,safety:1,adc,avgday:adc,days_cover:cover,
+      status,stockout_risk:cover!=null&&cover<lead,overstock:over,dead:issued===0&&closing>0,
+      days_since_issue:issued===0?75:5,where_used:fg,customer:cust,
+      planned_req:planned,plan_gap:planned>0?(closing+transit-planned):null,
+      reorder_qty:Math.max(0,maxL-closing),place_order:status!=="OK",
+      suggest_order:status!=="OK"?Math.max(moq,Math.round(maxL-closing)):0,
+      in_series:inS,series:outS,turns:closing*rate>0?(issued*rate*12)/(closing*rate):null};
+  };
+  const z=Array(31).fill(0), spread=(t,days)=>{const a=Array(31).fill(0);days.forEach(([d,v])=>a[d]=v);return a;};
+  const items=[
+    mk("SKUSS1","SS 0.15 X 150","SS",235,2354,727,48.5,15,150,spread(0,[[2,1200],[15,1100]]),spread(0,[[3,400],[18,375]]),0,"Indian Neppon (Hosur)","M. Case INEL N2041208",1500),
+    mk("SKUSS2","SS 0.15 X 152","SS",235,756,937,62.5,15,150,spread(0,[[4,600]]),spread(0,[[5,413],[12,497]]),200,"Flash Electronics","Magnet Case 0212940631",1800),
+    mk("SKUSS4","SS 0.15 X 163","SS",235,4360,4360,290,15,150,spread(0,[[1,2000],[20,2300]]),spread(0,[[6,1500],[22,800]]),0,"Varroc Engineering","Value BR",6000),
+    mk("SKUHR12","HR 2.50 X 1250","HR",62,180,3000,120,20,500,z,spread(0,[[8,900],[19,400]]),1000,"Bajaj Auto","Bracket Assy",3600),
+    mk("SKUCR8","CRCA 0.80 X 1250","CRCA",58,8200,5000,95,18,500,spread(0,[[5,4000]]),spread(0,[[10,1200]]),0,"Endurance","Cover Plate",2850),
+    mk("SKUALU2","Alum 4.00 X 105 X 1220","Aluminium",242,161,800,12,15,100,spread(0,[[1,161]]),z,0,"Varroc","Heat Sink",0),
+    mk("SKUE34","E34 0.50 X 1200","Electrical Steel",88,0,2000,140,21,500,z,spread(0,[[2,1800],[14,1600]]),1500,"Lucas TVS","Stator Lam",4200),
+    mk("SKUSAPH","SAPH440 3.0 X 1500","SAPH",70,5400,3000,40,20,300,spread(0,[[12,3000]]),spread(0,[[15,800]]),0,"Mahindra","Chassis Brkt",1200)];
+  const tot=items.reduce((s,i)=>s+i.stock_value,0);let cum=0;
+  items.slice().sort((a,b)=>b.stock_value-a.stock_value).forEach(it=>{cum+=it.stock_value;const p=tot>0?cum/tot:1;it.abc=p<=.8?"A":p<=.95?"B":"C";});
+  const roll=()=>{const g={};items.forEach(it=>{const c=it.category;if(!g[c])g[c]={category:c,items:0,stock_value:0,closing:0,issued:0,received:0};g[c].items++;g[c].stock_value+=it.stock_value;g[c].closing+=it.closing;g[c].issued+=it.issued;g[c].received+=it.received;});return Object.values(g).sort((a,b)=>b.stock_value-a.stock_value);};
+  const custMap={};items.forEach(i=>{if(!i.customer)return;if(!custMap[i.customer])custMap[i.customer]={customer:i.customer,nos:0,rm_kg:0,lines:0};custMap[i.customer].rm_kg+=i.planned_req;custMap[i.customer].lines++;custMap[i.customer].nos+=Math.round(i.planned_req*30);});
+  const vlow=items.filter(i=>i.status==="VERY LOW"),low=items.filter(i=>i.status==="LOW"),ok=items.filter(i=>i.status==="OK");
+  const alerts=[];items.forEach(i=>{
+    if(i.closing<=0)alerts.push({sev:"critical",type:"Stockout",code:i.code,desc:i.desc,msg:"Zero stock — production at risk",value:i.stock_value});
+    else if(i.status==="VERY LOW")alerts.push({sev:"critical",type:"Stock",code:i.code,desc:i.desc,msg:"Below MOQ ("+i.closing+" vs "+i.min+")",value:i.stock_value});
+    else if(i.status==="LOW")alerts.push({sev:"warn",type:"Stock",code:i.code,desc:i.desc,msg:"Approaching reorder",value:i.stock_value});
+    if(i.stockout_risk&&i.closing>0)alerts.push({sev:"critical",type:"Coverage",code:i.code,desc:i.desc,msg:"Only "+Math.round(i.days_cover)+"d cover, lead "+i.lead_time+"d",value:i.consumed_value});
+    if(i.plan_gap!=null&&i.plan_gap<0)alerts.push({sev:"warn",type:"Schedule gap",code:i.code,desc:i.desc,msg:"Short "+Math.round(-i.plan_gap)+" vs plan",value:i.stock_value});
+    if(i.overstock)alerts.push({sev:"info",type:"Overstock",code:i.code,desc:i.desc,msg:i.closing+" above max "+i.max,value:i.stock_value});
+    if(i.dead)alerts.push({sev:"info",type:"Dead stock",code:i.code,desc:i.desc,msg:"No issue 60+ days",value:i.stock_value});});
+  const rank={critical:0,warn:1,info:2};alerts.sort((a,b)=>(rank[a.sev]-rank[b.sev])||(b.value-a.value));
+  const byVal=items.slice().sort((a,b)=>b.stock_value-a.stock_value);let c2=0;
+  const pareto=byVal.slice(0,15).map(i=>{c2+=i.stock_value;return{code:i.code,desc:i.desc,cost:i.stock_value,cum_pct:tot>0?c2/tot:0,abc:i.abc};});
+  const ag=cl=>{const f=items.filter(i=>i.abc===cl);return{cls:cl,items:f.length,value:f.reduce((s,i)=>s+i.stock_value,0)};};
+  const slow=items.filter(i=>i.days_cover!=null&&i.days_cover>60&&i.closing>0).sort((a,b)=>b.stock_value-a.stock_value).map(i=>({code:i.code,desc:i.desc,days_cover:Math.round(i.days_cover),value:i.stock_value}));
+  const pva=items.filter(i=>i.planned_req>0).map(i=>({code:i.code,desc:i.desc,planned:Math.round(i.planned_req),available:Math.round(i.closing+i.in_transit),gap:Math.round(i.plan_gap||0),uom:i.uom})).sort((a,b)=>a.gap-b.gap);
+  return {updated:new Date().toISOString(),domain:"rm",
+    kpi:{items_tracked:316,stock_value:tot,consumed_value:items.reduce((s,i)=>s+i.consumed_value,0),
+      received_value:items.reduce((s,i)=>s+i.received*i.rate,0),in_transit_value:items.reduce((s,i)=>s+i.in_transit*i.rate,0),
+      below_min:vlow.length+low.length,very_low:vlow.length,low:low.length,ok:ok.length,
+      stockout_count:items.filter(i=>i.closing<=0).length,overstock_count:items.filter(i=>i.overstock).length,
+      dead_stock:items.filter(i=>i.dead).length,dead_stock_value:items.filter(i=>i.dead).reduce((s,i)=>s+i.stock_value,0),
+      qty_issued:items.reduce((s,i)=>s+i.issued,0),qty_received:items.reduce((s,i)=>s+i.received,0)},
+    items,categories:roll(),customers:Object.values(custMap).sort((a,b)=>b.rm_kg-a.rm_kg),
+    reorder:vlow.concat(low).map(i=>({code:i.code,desc:i.desc,closing:i.closing,uom:i.uom,min:i.min,days_cover:i.days_cover,reorder_qty:i.reorder_qty,suggest:i.suggest_order,place:i.place_order,customer:i.customer})).sort((a,b)=>(a.days_cover||999)-(b.days_cover||999)),
+    alerts,analytics:{pareto,abc:[ag("A"),ag("B"),ag("C")],slow_movers:slow,plan_vs_actual:pva,dead_value:items.filter(i=>i.dead).reduce((s,i)=>s+i.stock_value,0)},
+    schedule:items.filter(i=>i.planned_req>0).map(i=>({sku:i.code,customer:i.customer,fg:i.where_used,nos:0,rm:i.desc,req_kg:i.planned_req}))};
+}
+function rmSetStatus(s){const d=document.getElementById("rdot"),t=document.getElementById("rstatustext");
+  d.className="live-dot"+(s==="live"?" on":"");
+  t.textContent=s==="live"?"Live":(s==="loading"?"Loading…":(s==="error"?"Offline — sample":"Sample data"));}
+async function rmLoad(){
+  if(!TOKEN) return; rmSetStatus("loading");
+  try{
+    if(RM_API_URL){
+      const r=await fetch(RM_API_URL+"?token="+encodeURIComponent(TOKEN));
+      const d=await r.json();
+      if(d.auth===false){ logout(); return; }
+      RM_RAW=d; rmSetStatus("live");
+    } else { RM_RAW=rmSample(); rmSetStatus("sample"); }
+  }catch(e){ RM_RAW=rmSample(); rmSetStatus("error"); }
+  rmRenderAll();
+}
+function startRmAuto(){clearInterval(rmTimer);rmTimer=setInterval(rmLoad,10000);}
+function rmRenderAll(){
+  document.getElementById("rupdated").textContent=new Date(RM_RAW.updated).toLocaleTimeString("en-IN");
+  rmRenderDash();rmRenderItems();rmRenderMove();rmRenderSched();rmRenderCust();rmRenderAnalytics();rmRenderAlerts();
+}
+function rmRenderDash(){
+  const k=RM_RAW.kpi;
+  document.getElementById("rkpiTop").innerHTML=[
+    card("Stock Value",inr(k.stock_value),"raw material capital","green","₹"),
+    card("Below Reorder",k.below_min,"order now","red","⚠"),
+    card("Stockouts",k.stockout_count||0,"materials at zero","red","⛔"),
+    card("In Transit",inr(k.in_transit_value||0),"on the way in","indigo","🚚")].join("");
+  document.getElementById("rkpiMid").innerHTML=[
+    card("Received (mo)",inr(k.received_value||0),Math.round(k.qty_received||0).toLocaleString("en-IN")+" units in","indigo","📥"),
+    card("Issued (mo)",inr(k.consumed_value||0),Math.round(k.qty_issued||0).toLocaleString("en-IN")+" units out","indigo","📤"),
+    card("Dead Stock",inr(k.dead_stock_value||0),(k.dead_stock||0)+" idle materials","amber","🗄"),
+    card("Overstock",k.overstock_count||0,"above max level","amber","📈")].join("");
+  // banners
+  const bs=document.getElementById("rbannerStack");const b=[];
+  if(k.stockout_count>0)b.push(`<div class="miniban crit">⛔ ${k.stockout_count} material(s) at ZERO stock — production may stop</div>`);
+  if(k.below_min>0)b.push(`<div class="miniban warn">⚠ ${k.below_min} material(s) below reorder line</div>`);
+  bs.innerHTML=b.join("");
+  // reorder table
+  const tb=document.querySelector("#rReorderTable tbody");
+  tb.innerHTML=(RM_RAW.reorder||[]).map(r=>`<tr class="${r.days_cover!=null&&r.days_cover<r.min?'alertrow':''}">
+    <td class="code">${r.code}</td><td>${r.desc}</td><td class="r">${fmt(r.closing)}</td>
+    <td class="r">${fmt(r.min)}</td><td class="r">${r.days_cover!=null?Math.round(r.days_cover)+"d":"—"}</td>
+    <td class="r">${r.suggest?fmt(r.suggest):"—"}</td><td>${r.customer||"—"}</td></tr>`).join("")||`<tr><td colspan="7" class="empty">All materials above reorder line 🎉</td></tr>`;
+  // charts
+  const cats=RM_RAW.categories||[];
+  rmDonut("rGradeChart",rGradeChart,cats.map(c=>c.category),cats.map(c=>Math.round(c.stock_value)),v=>rGradeChart=v);
+  rmHealth();
+  rmBar();
+}
+function rmDonut(id,inst,labels,data,save){
+  const el=document.getElementById(id);if(!el)return;if(inst)inst.destroy();
+  save(new Chart(el,{type:"doughnut",data:{labels,datasets:[{data,backgroundColor:pal}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"right",labels:{boxWidth:12,font:{size:11}}},
+      tooltip:{callbacks:{label:c=>c.label+": "+inr(c.parsed)}}}}}));
+}
+function rmHealth(){
+  const el=document.getElementById("rHealthChart");if(!el)return;if(rHealthChart)rHealthChart.destroy();
+  const k=RM_RAW.kpi;
+  rHealthChart=new Chart(el,{type:"doughnut",data:{labels:["Healthy","Low","Very Low / Out"],
+    datasets:[{data:[k.ok,k.low,k.very_low],backgroundColor:["#0f9d58","#f5a623","#c0264a"]}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom"}}}});
+}
+function rmBar(){
+  const el=document.getElementById("rGradeBar");if(!el)return;if(rGradeBar)rGradeBar.destroy();
+  const cats=RM_RAW.categories||[];
+  rGradeBar=new Chart(el,{type:"bar",data:{labels:cats.map(c=>c.category),
+    datasets:[{label:"Stock Value ₹",data:cats.map(c=>Math.round(c.stock_value)),backgroundColor:"#5b5bd6",borderRadius:6}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>inr(c.parsed.y)}}},
+      scales:{y:{ticks:{callback:v=>"₹"+(v/1000)+"k"}}}}});
+}
+function rmRenderItems(){
+  const it=RM_RAW.items||[];
+  document.getElementById("rItemsSub").textContent=it.length+" materials total — filter and search to focus";
+  const cnt=f=>it.filter(f).length;
+  document.getElementById("rcAll").textContent=it.length;
+  document.getElementById("rcVL").textContent=cnt(i=>i.status==="VERY LOW");
+  document.getElementById("rcLO").textContent=cnt(i=>i.status==="LOW");
+  document.getElementById("rcOK").textContent=cnt(i=>i.status==="OK");
+  document.getElementById("rcOV").textContent=cnt(i=>i.overstock);
+  document.getElementById("rcDS").textContent=cnt(i=>i.dead);
+  rmDrawItems();
+}
+function rmDrawItems(){
+  const q=(document.getElementById("rItemSearch").value||"").toLowerCase();
+  let it=(RM_RAW.items||[]).slice();
+  if(rItemFilter==="dead")it=it.filter(i=>i.dead);
+  else if(rItemFilter==="over")it=it.filter(i=>i.overstock);
+  else if(rItemFilter!=="all")it=it.filter(i=>i.status===rItemFilter);
+  if(q)it=it.filter(i=>(i.code+" "+i.desc+" "+(i.customer||"")+" "+(i.where_used||"")).toLowerCase().includes(q));
+  it.sort((a,b)=>b.stock_value-a.stock_value);
+  document.querySelector("#rItemsTable tbody").innerHTML=it.map(i=>`<tr class="${i.status==='VERY LOW'?'alertrow':''}">
+    <td class="code">${i.code}</td><td>${i.desc}</td><td>${i.uom}</td>
+    <td class="r">${fmt(i.rate)}</td><td class="r">${fmt(i.received)}</td><td class="r">${fmt(i.issued)}</td>
+    <td class="r"><b>${fmt(i.closing)}</b></td><td class="r">${i.in_transit?fmt(i.in_transit):"—"}</td>
+    <td class="r">${inr(i.stock_value)}</td><td class="r">${fmt(i.adc)}</td>
+    <td class="r">${i.days_cover!=null?Math.round(i.days_cover)+"d":"—"}</td><td class="r">${fmt(i.reorder_point)}</td>
+    <td><span class="pill ${cls(i.status)}">${i.status}</span></td><td><span class="abc ${i.abc}">${i.abc}</span></td></tr>`).join("")
+    ||`<tr><td colspan="14" class="empty">No materials match.</td></tr>`;
+}
+function rmRenderMove(){
+  const it=RM_RAW.items||[];
+  document.getElementById("rmAll").textContent=it.length;
+  document.getElementById("rmMoved").textContent=it.filter(i=>i.issued>0||i.received>0).length;
+  // build header: SKU + 31 days
+  const days=Array.from({length:31},(_,i)=>i+1);
+  document.getElementById("rMoveHead").innerHTML="<tr><th class='lbl'>Material</th>"+days.map(d=>`<th>${d}</th>`).join("")+"<th>Total</th></tr>";
+  rmDrawMove();
+}
+function rmDrawMove(){
+  const q=(document.getElementById("rMoveSearch").value||"").toLowerCase();
+  const type=document.getElementById("rMoveType").value;
+  let it=(RM_RAW.items||[]).slice();
+  if(rMoveFilter==="moved")it=it.filter(i=>i.issued>0||i.received>0);
+  if(q)it=it.filter(i=>(i.code+" "+i.desc).toLowerCase().includes(q));
+  const rows=[];
+  it.forEach(i=>{
+    if(type!=="out"){const has=(i.in_series||[]).some(x=>x>0);if(has||type==="in"){
+      rows.push(`<tr class="mvrow-in"><td class="lbl">${i.desc}<br><small>${i.code} · IN</small></td>`+
+        (i.in_series||[]).map(v=>`<td>${v>0?`<span class="mvin">${fmt(v)}</span>`:""}</td>`).join("")+
+        `<td class="r"><b>${fmt(i.received)}</b></td></tr>`);}}
+    if(type!=="in"){const has=(i.series||[]).some(x=>x>0);if(has||type==="out"){
+      rows.push(`<tr class="mvrow-out"><td class="lbl">${i.desc}<br><small>${i.code} · OUT</small></td>`+
+        (i.series||[]).map(v=>`<td>${v>0?`<span class="mvout">${fmt(v)}</span>`:""}</td>`).join("")+
+        `<td class="r"><b>${fmt(i.issued)}</b></td></tr>`);}}
+  });
+  document.querySelector("#rMoveTable tbody").innerHTML=rows.join("")||`<tr><td class="lbl">—</td><td colspan="32" class="empty">No movement.</td></tr>`;
+}
+function rmRenderSched(){
+  const pva=(RM_RAW.analytics&&RM_RAW.analytics.plan_vs_actual)||[];
+  document.getElementById("rsAll").textContent=pva.length;
+  document.getElementById("rsShort").textContent=pva.filter(p=>p.gap<0).length;
+  rmDrawSched();
+}
+function rmDrawSched(){
+  const q=(document.getElementById("rSchedSearch").value||"").toLowerCase();
+  let pva=((RM_RAW.analytics&&RM_RAW.analytics.plan_vs_actual)||[]).slice();
+  if(rSchedFilter==="short")pva=pva.filter(p=>p.gap<0);
+  if(q)pva=pva.filter(p=>(p.code+" "+p.desc).toLowerCase().includes(q));
+  document.querySelector("#rSchedTable tbody").innerHTML=pva.map(p=>{
+    const short=p.gap<0;const transit=p.available-(RM_RAW.items.find(i=>i.code===p.code)?.closing||0);
+    return `<tr class="${short?'alertrow':''}"><td class="code">${p.code}</td><td>${p.desc}</td>
+      <td class="r">${fmt(p.planned)}</td><td class="r">${fmt(p.available-Math.round(transit))}</td>
+      <td class="r">${transit>0?fmt(Math.round(transit)):"—"}</td><td class="r"><b>${fmt(p.available)}</b></td>
+      <td class="r" style="color:${short?'var(--vlow)':'var(--ok)'};font-weight:700">${short?'':'+'}${fmt(p.gap)}</td>
+      <td><span class="pill ${short?'VERYLOW':'OK'}">${short?'SHORT':'COVERED'}</span></td></tr>`;}).join("")
+    ||`<tr><td colspan="8" class="empty">No scheduled materials.</td></tr>`;
+}
+function rmRenderCust(){
+  const c=RM_RAW.customers||[];const tot=c.reduce((s,x)=>s+x.rm_kg,0);
+  document.querySelector("#rCustTable tbody").innerHTML=c.map(x=>`<tr>
+    <td><b>${x.customer}</b></td><td class="r">${x.lines}</td><td class="r">${fmt(Math.round(x.nos))}</td>
+    <td class="r">${fmt(Math.round(x.rm_kg))}</td><td class="r">${tot>0?Math.round(x.rm_kg/tot*100):0}%</td></tr>`).join("")
+    ||`<tr><td colspan="5" class="empty">No customer schedule loaded.</td></tr>`;
+}
+function rmRenderAnalytics(){
+  const a=RM_RAW.analytics||{};
+  document.getElementById("rAbcCards").innerHTML=(a.abc||[]).map(x=>{
+    const kind=x.cls==="A"?"red":x.cls==="B"?"amber":"green";
+    return card("Class "+x.cls,inr(x.value),x.items+" materials","",`<span class="abc ${x.cls}">${x.cls}</span>`).replace('class="c "',`class="c ${kind}"`);}).join("");
+  // pareto
+  const el=document.getElementById("rParetoChart");if(el){if(rParetoChart)rParetoChart.destroy();
+    const p=a.pareto||[];
+    rParetoChart=new Chart(el,{data:{labels:p.map(x=>x.code),datasets:[
+      {type:"bar",label:"Stock Value ₹",data:p.map(x=>Math.round(x.cost)),backgroundColor:"#5b5bd6",borderRadius:5,yAxisID:"y"},
+      {type:"line",label:"Cumulative %",data:p.map(x=>Math.round(x.cum_pct*100)),borderColor:"#c0264a",yAxisID:"y1",tension:.3}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom"}},
+        scales:{y:{ticks:{callback:v=>"₹"+(v/1000)+"k"}},y1:{position:"right",max:100,ticks:{callback:v=>v+"%"}}}}});}
+  const el2=document.getElementById("rAbcChart");if(el2){if(rAbcChart)rAbcChart.destroy();
+    rAbcChart=new Chart(el2,{type:"doughnut",data:{labels:(a.abc||[]).map(x=>"Class "+x.cls),
+      datasets:[{data:(a.abc||[]).map(x=>x.value),backgroundColor:["#c0264a","#f5a623","#0f9d58"]}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom"},tooltip:{callbacks:{label:c=>c.label+": "+inr(c.parsed)}}}}});}
+  document.querySelector("#rSlowTable tbody").innerHTML=(a.slow_movers||[]).map(s=>`<tr>
+    <td class="code">${s.code}</td><td>${s.desc}</td><td class="r">${s.days_cover}d</td><td class="r">${inr(s.value)}</td></tr>`).join("")
+    ||`<tr><td colspan="4" class="empty">No slow movers 🎉</td></tr>`;
+}
+function rmRenderAlerts(){
+  const al=RM_RAW.alerts||[];
+  const cnt=s=>al.filter(a=>a.sev===s).length;
+  document.getElementById("raAll").textContent=al.length;
+  document.getElementById("raCrit").textContent=cnt("critical");
+  document.getElementById("raWarn").textContent=cnt("warn");
+  document.getElementById("raInfo").textContent=cnt("info");
+  const badge=document.getElementById("rmAlertBadge");const crit=cnt("critical");
+  if(crit>0){badge.style.display="inline-block";badge.textContent=crit;}else badge.style.display="none";
+  rmDrawAlerts();
+}
+function rmDrawAlerts(){
+  let al=(RM_RAW.alerts||[]).slice();
+  if(rAlertFilter!=="all")al=al.filter(a=>a.sev===rAlertFilter);
+  document.getElementById("rAlertList").innerHTML=al.map(a=>`<div class="alertcard">
+    <span class="sevtag sev-${a.sev}">${a.sev}</span>
+    <span class="typ">${a.type}</span>
+    <span class="msg"><span class="code">${a.code}</span> ${a.desc} — ${a.msg}</span>
+    <span style="font-weight:700">${inr(a.value)}</span></div>`).join("")||`<div class="empty">No alerts 🎉</div>`;
+}
+/* consumable nav + page wiring (scoped) */
+document.querySelectorAll('#consApp nav .tab[data-p]').forEach(t=>t.onclick=()=>{document.querySelectorAll('#consApp nav .tab').forEach(x=>x.classList.remove("on"));document.querySelectorAll('#consApp .page').forEach(x=>x.classList.remove("on"));t.classList.add("on");document.getElementById(t.dataset.p).classList.add("on");});
+/* RM nav + filter wiring */
+document.querySelectorAll('#rmApp nav .tab[data-rp]').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('#rmApp nav .tab').forEach(x=>x.classList.remove("on"));
+  document.querySelectorAll('#rmApp .page').forEach(x=>x.classList.remove("on"));
+  t.classList.add("on");document.getElementById(t.dataset.rp).classList.add("on");});
+document.querySelectorAll('.chip[data-rf]').forEach(c=>c.onclick=()=>{document.querySelectorAll('.chip[data-rf]').forEach(x=>x.classList.remove("on"));c.classList.add("on");rItemFilter=c.dataset.rf;rmDrawItems();});
+document.querySelectorAll('.chip[data-rmf]').forEach(c=>c.onclick=()=>{document.querySelectorAll('.chip[data-rmf]').forEach(x=>x.classList.remove("on"));c.classList.add("on");rMoveFilter=c.dataset.rmf;rmDrawMove();});
+document.querySelectorAll('.chip[data-rsf]').forEach(c=>c.onclick=()=>{document.querySelectorAll('.chip[data-rsf]').forEach(x=>x.classList.remove("on"));c.classList.add("on");rSchedFilter=c.dataset.rsf;rmDrawSched();});
+document.querySelectorAll('.chip[data-raf]').forEach(c=>c.onclick=()=>{document.querySelectorAll('.chip[data-raf]').forEach(x=>x.classList.remove("on"));c.classList.add("on");rAlertFilter=c.dataset.raf;rmDrawAlerts();});
+document.getElementById("rItemSearch").oninput=rmDrawItems;
+document.getElementById("rMoveSearch").oninput=rmDrawMove;
+document.getElementById("rMoveType").onchange=rmDrawMove;
+document.getElementById("rSchedSearch").oninput=rmDrawSched;
+document.getElementById("rauto").onchange=e=>{if(e.target.checked)startRmAuto();else clearInterval(rmTimer);};
+document.getElementById("rlogoutBtn").onclick=logout;
+/* portal wiring */
+document.querySelectorAll(".portalCard").forEach(c=>c.onclick=()=>openDashboard(c.dataset.go));
+document.getElementById("portalLogout").onclick=logout;
+document.querySelectorAll('.tab[data-portal]').forEach(t=>t.onclick=showPortal);
+
+
 document.querySelectorAll(".chip[data-f]").forEach(c=>c.onclick=()=>{document.querySelectorAll(".chip[data-f]").forEach(x=>x.classList.remove("on"));c.classList.add("on");itemFilter=c.dataset.f;drawItems();});
 document.querySelectorAll(".chip[data-af]").forEach(c=>c.onclick=()=>{document.querySelectorAll(".chip[data-af]").forEach(x=>x.classList.remove("on"));c.classList.add("on");alertFilter=c.dataset.af;drawAlerts();});
 document.getElementById("groupBy").onchange=()=>{document.getElementById("focusSel").value="__all";renderAnalytics();};
