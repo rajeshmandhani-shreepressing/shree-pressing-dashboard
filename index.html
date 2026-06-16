@@ -96,7 +96,7 @@
   <div style="background:#fff;border-radius:18px;padding:38px 34px;width:340px;box-shadow:0 20px 60px rgba(0,0,0,.4)">
     <div style="height:4px;background:linear-gradient(90deg,#f5a623,#f7c34a);border-radius:4px;margin:-38px -34px 24px;border-radius:18px 18px 0 0"></div>
     <h2 style="font-size:20px;font-weight:800;color:#1a1f29;margin-bottom:4px">SHREE PRESSING</h2>
-    <p style="color:#7b8494;font-size:13px;margin-bottom:22px">Consumables Portal — sign in to continue</p>
+    <p style="color:#7b8494;font-size:13px;margin-bottom:22px">IMS Portal — sign in to continue</p>
     <input id="loginUser" placeholder="Username" autocomplete="username" style="width:100%;padding:12px 14px;border:1px solid #e7eaef;border-radius:10px;font-size:14px;margin-bottom:12px">
     <input id="loginPass" type="password" placeholder="Password" autocomplete="current-password" style="width:100%;padding:12px 14px;border:1px solid #e7eaef;border-radius:10px;font-size:14px;margin-bottom:16px">
     <button id="loginBtn" style="width:100%;padding:12px;background:#5b5bd6;color:#fff;border:none;border-radius:10px;font-weight:700;font-size:15px;cursor:pointer">Sign in</button>
@@ -413,6 +413,7 @@
   <div class="tab" data-rp="rcust">🏷 By Customer</div>
   <div class="tab" data-rp="ranalytics">📊 Analytics</div>
   <div class="tab" data-rp="ralerts">🔔 Alerts <span class="navbadge" id="rmAlertBadge" style="display:none">0</span></div>
+  <div class="tab" data-rp="rreports">🗂 Reports</div>
   <div class="spacer">
     <span><span class="live-dot" id="rdot"></span><span id="rstatustext">Loading…</span></span>
     <label style="cursor:pointer"><input type="checkbox" id="rauto" checked> Auto-refresh 10s</label>
@@ -517,12 +518,24 @@
     <div class="panel" id="rAlertList"></div>
   </section>
 
+  <section class="page" id="rreports">
+    <h1 class="title">Reports</h1>
+    <p class="sub">Pick a report, then use “Print / Save PDF” to hand a clean copy to the director.</p>
+    <div class="toolbar">
+      <button class="btn primary" onclick="rmBuildReport('daily')">📅 Daily Stock Value</button>
+      <button class="btn" onclick="rmBuildReport('weekly')">🗄 Weekly Non-Moving / Dead Stock</button>
+      <button class="btn" onclick="rmBuildReport('reorder')">⚠ Reorder / Shortage List</button>
+      <button class="btn" onclick="window.print()">🖨 Print / Save PDF</button>
+    </div>
+    <div class="panel" id="rReportOut"><div class="empty">Choose a report above.</div></div>
+  </section>
+
   <footer>BUILT FOR SHREE PRESSING · RAW MATERIAL IMS · LIVE DATA · VIEW-ONLY</footer>
 </main>
 </div><!-- /rmApp -->
 <script>
 const API_URL = "https://script.google.com/macros/s/AKfycbyF7o8FSC3XqstgD5rwol5DJSgL2nB3gVSHdnvvdG2JtJah7aBVRZbg2u8g1-X9_7BV/exec";   /* consumable Apps Script /exec URL */
-const RM_API_URL = "https://script.google.com/macros/s/AKfycbyMqYdl0UnFFH9_Zl6kTELsoWK_MOGu-u55hEfSe0hX0NQAdeldie_dco5ygfFh26sx6A/exec";   /* paste the RM-IMS Apps Script /exec URL here to go live (deploy RM_IMS_Dashboard_Code.gs on the RM sheet) */
+const RM_API_URL = "https://script.google.com/macros/s/AKfycbxdmYCMxSCr2I15tv_pKC84dBQCVj4tYI7PYk8Z91pRFIvaY55FCx5Pax0QFFLuQkNs2w/exec";   /* paste the RM-IMS Apps Script /exec URL here to go live (deploy RM_IMS_Dashboard_Code.gs on the RM sheet) */
 let TOKEN = null;     // set after login (kept in memory only); shared by BOTH dashboards
 let RM_RAW=null, rmTimer=null, rItemFilter="all", rMoveFilter="all", rSchedFilter="all", rAlertFilter="all";
 let rGradeChart,rHealthChart,rGradeBar,rParetoChart,rAbcChart;
@@ -1530,6 +1543,8 @@ function rmSample(){
       below_min:vlow.length+low.length,very_low:vlow.length,low:low.length,ok:ok.length,
       stockout_count:items.filter(i=>i.closing<=0).length,overstock_count:items.filter(i=>i.overstock).length,
       dead_stock:items.filter(i=>i.dead).length,dead_stock_value:items.filter(i=>i.dead).reduce((s,i)=>s+i.stock_value,0),
+      dead_stock_qty:items.filter(i=>i.dead).reduce((s,i)=>s+i.closing,0),
+      closing_qty:items.reduce((s,i)=>s+i.closing,0),
       qty_issued:items.reduce((s,i)=>s+i.issued,0),qty_received:items.reduce((s,i)=>s+i.received,0)},
     items,categories:roll(),customers:Object.values(custMap).sort((a,b)=>b.rm_kg-a.rm_kg),
     reorder:vlow.concat(low).map(i=>({code:i.code,desc:i.desc,closing:i.closing,uom:i.uom,min:i.min,days_cover:i.days_cover,reorder_qty:i.reorder_qty,suggest:i.suggest_order,place:i.place_order,customer:i.customer})).sort((a,b)=>(a.days_cover||999)-(b.days_cover||999)),
@@ -1556,18 +1571,35 @@ function rmRenderAll(){
   document.getElementById("rupdated").textContent=new Date(RM_RAW.updated).toLocaleTimeString("en-IN");
   rmRenderDash();rmRenderItems();rmRenderMove();rmRenderSched();rmRenderCust();rmRenderAnalytics();rmRenderAlerts();
 }
+function rmGoItems(filter){
+  // jump to Materials tab pre-filtered. filter: all|VERY LOW|LOW|OK|over|dead
+  document.querySelectorAll('#rmApp nav .tab').forEach(x=>x.classList.remove("on"));
+  document.querySelectorAll('#rmApp .page').forEach(x=>x.classList.remove("on"));
+  const tab=document.querySelector('#rmApp nav .tab[data-rp="ritems"]');
+  if(tab) tab.classList.add("on");
+  document.getElementById("ritems").classList.add("on");
+  rItemFilter=filter;
+  document.querySelectorAll('.chip[data-rf]').forEach(x=>x.classList.toggle("on",x.dataset.rf===filter));
+  rmDrawItems();
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+// clickable KPI card: pass a filter to make it jump to the Materials list
+function rcard(lab,big,note,kind,ic,filter){
+  const cl=filter?'style="cursor:pointer" onclick="rmGoItems(\''+filter+'\')"':'';
+  return `<div class="c ${kind||''}" ${cl}><div class="lab">${lab}</div><div class="big">${big}</div>${note?`<div class="note">${note}</div>`:""}<div class="ic">${ic||''}</div></div>`;
+}
 function rmRenderDash(){
   const k=RM_RAW.kpi;
+  const kg=n=>Math.round(n||0).toLocaleString("en-IN")+" kg";
   document.getElementById("rkpiTop").innerHTML=[
-    card("Stock Value",inr(k.stock_value),"raw material capital","green","₹"),
-    card("Below Reorder",k.below_min,"order now","red","⚠"),
-    card("Stockouts",k.stockout_count||0,"materials at zero","red","⛔"),
-    card("In Transit",inr(k.in_transit_value||0),"on the way in","indigo","🚚")].join("");
+    rcard("Stock Value",inr(k.stock_value),"raw material capital","green","₹"),
+    rcard("Stock on Shelf",kg(k.closing_qty),"total closing quantity","indigo","⚖"),
+    rcard("Below Reorder",k.below_min,"click to order list","red","⚠","LOW"),
+    rcard("Stockouts",k.stockout_count||0,"materials at zero","red","⛔","VERY LOW")].join("");
   document.getElementById("rkpiMid").innerHTML=[
-    card("Received (mo)",inr(k.received_value||0),Math.round(k.qty_received||0).toLocaleString("en-IN")+" units in","indigo","📥"),
-    card("Issued (mo)",inr(k.consumed_value||0),Math.round(k.qty_issued||0).toLocaleString("en-IN")+" units out","indigo","📤"),
-    card("Dead Stock",inr(k.dead_stock_value||0),(k.dead_stock||0)+" idle materials","amber","🗄"),
-    card("Overstock",k.overstock_count||0,"above max level","amber","📈")].join("");
+    rcard("Non-Moving / Dead Stock",inr(k.dead_stock_value||0),(k.dead_stock||0)+" items · "+kg(k.dead_stock_qty)+" idle","amber","🗄","dead"),
+    rcard("Overstock",k.overstock_count||0,"above max level","amber","📈","over"),
+    rcard("Total Materials",(k.items_tracked||0).toLocaleString("en-IN"),"click for full list","green","🪨","all")].join("");
   // banners
   const bs=document.getElementById("rbannerStack");const b=[];
   if(k.stockout_count>0)b.push(`<div class="miniban crit">⛔ ${k.stockout_count} material(s) at ZERO stock — production may stop</div>`);
@@ -1585,25 +1617,44 @@ function rmRenderDash(){
   rmHealth();
   rmBar();
 }
+function rmGoItemsSearch(text){
+  document.querySelectorAll('#rmApp nav .tab').forEach(x=>x.classList.remove("on"));
+  document.querySelectorAll('#rmApp .page').forEach(x=>x.classList.remove("on"));
+  const tab=document.querySelector('#rmApp nav .tab[data-rp="ritems"]');
+  if(tab) tab.classList.add("on");
+  document.getElementById("ritems").classList.add("on");
+  rItemFilter="all";
+  document.querySelectorAll('.chip[data-rf]').forEach(x=>x.classList.toggle("on",x.dataset.rf==="all"));
+  document.getElementById("rItemSearch").value=text;
+  rmDrawItems();
+  window.scrollTo({top:0,behavior:"smooth"});
+}
 function rmDonut(id,inst,labels,data,save){
   const el=document.getElementById(id);if(!el)return;if(inst)inst.destroy();
   save(new Chart(el,{type:"doughnut",data:{labels,datasets:[{data,backgroundColor:pal}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"right",labels:{boxWidth:12,font:{size:11}}},
-      tooltip:{callbacks:{label:c=>c.label+": "+inr(c.parsed)}}}}}));
+    options:{responsive:true,maintainAspectRatio:false,
+      onClick:(e,els)=>{if(els.length){rmGoItemsSearch(labels[els[0].index]);}},
+      plugins:{legend:{position:"right",labels:{boxWidth:12,font:{size:11}}},
+      tooltip:{callbacks:{label:c=>c.label+": "+inr(c.parsed)+"  (click to view)"}}}}}));
 }
 function rmHealth(){
   const el=document.getElementById("rHealthChart");if(!el)return;if(rHealthChart)rHealthChart.destroy();
   const k=RM_RAW.kpi;
+  const targets=["OK","LOW","VERY LOW"];
   rHealthChart=new Chart(el,{type:"doughnut",data:{labels:["Healthy","Low","Very Low / Out"],
     datasets:[{data:[k.ok,k.low,k.very_low],backgroundColor:["#0f9d58","#f5a623","#c0264a"]}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom"}}}});
+    options:{responsive:true,maintainAspectRatio:false,
+      onClick:(e,els)=>{if(els.length){rmGoItems(targets[els[0].index]);}},
+      plugins:{legend:{position:"bottom"},tooltip:{callbacks:{label:c=>c.label+": "+c.parsed+"  (click to view)"}}}}});
 }
 function rmBar(){
   const el=document.getElementById("rGradeBar");if(!el)return;if(rGradeBar)rGradeBar.destroy();
-  const cats=RM_RAW.categories||[];
-  rGradeBar=new Chart(el,{type:"bar",data:{labels:cats.map(c=>c.category),
+  const cats=RM_RAW.categories||[];const labels=cats.map(c=>c.category);
+  rGradeBar=new Chart(el,{type:"bar",data:{labels,
     datasets:[{label:"Stock Value ₹",data:cats.map(c=>Math.round(c.stock_value)),backgroundColor:"#5b5bd6",borderRadius:6}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>inr(c.parsed.y)}}},
+    options:{responsive:true,maintainAspectRatio:false,
+      onClick:(e,els)=>{if(els.length){rmGoItemsSearch(labels[els[0].index]);}},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>inr(c.parsed.y)+"  (click to view)"}}},
       scales:{y:{ticks:{callback:v=>"₹"+(v/1000)+"k"}}}}});
 }
 function rmRenderItems(){
@@ -1624,7 +1675,7 @@ function rmDrawItems(){
   if(rItemFilter==="dead")it=it.filter(i=>i.dead);
   else if(rItemFilter==="over")it=it.filter(i=>i.overstock);
   else if(rItemFilter!=="all")it=it.filter(i=>i.status===rItemFilter);
-  if(q)it=it.filter(i=>(i.code+" "+i.desc+" "+(i.customer||"")+" "+(i.where_used||"")).toLowerCase().includes(q));
+  if(q)it=it.filter(i=>(i.code+" "+i.desc+" "+(i.category||"")+" "+(i.customer||"")+" "+(i.where_used||"")).toLowerCase().includes(q));
   it.sort((a,b)=>b.stock_value-a.stock_value);
   document.querySelector("#rItemsTable tbody").innerHTML=it.map(i=>`<tr class="${i.status==='VERY LOW'?'alertrow':''}">
     <td class="code">${i.code}</td><td>${i.desc}</td><td>${i.uom}</td>
@@ -1698,11 +1749,17 @@ function rmRenderAnalytics(){
   // pareto
   const el=document.getElementById("rParetoChart");if(el){if(rParetoChart)rParetoChart.destroy();
     const p=a.pareto||[];
-    rParetoChart=new Chart(el,{data:{labels:p.map(x=>x.code),datasets:[
+    const shortName=s=>{s=(""+s).trim();return s.length>22?s.slice(0,20)+"…":s;};
+    rParetoChart=new Chart(el,{data:{labels:p.map(x=>shortName(x.desc||x.code)),datasets:[
       {type:"bar",label:"Stock Value ₹",data:p.map(x=>Math.round(x.cost)),backgroundColor:"#5b5bd6",borderRadius:5,yAxisID:"y"},
       {type:"line",label:"Cumulative %",data:p.map(x=>Math.round(x.cum_pct*100)),borderColor:"#c0264a",yAxisID:"y1",tension:.3}]},
-      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom"}},
-        scales:{y:{ticks:{callback:v=>"₹"+(v/1000)+"k"}},y1:{position:"right",max:100,ticks:{callback:v=>v+"%"}}}}});}
+      options:{responsive:true,maintainAspectRatio:false,
+        onClick:(e,els)=>{if(els.length){rmGoItemsSearch(p[els[0].index].code);}},
+        plugins:{legend:{position:"bottom"},tooltip:{callbacks:{
+          title:items=>{const x=p[items[0].dataIndex];return x?(x.desc||x.code):"";},
+          afterTitle:items=>{const x=p[items[0].dataIndex];return x?x.code:"";},
+          label:c=>c.dataset.type==="line"?("Cumulative: "+c.parsed.y+"%"):("Stock Value: "+inr(c.parsed.y)+"  (click to view)")}}},
+        scales:{x:{ticks:{maxRotation:55,minRotation:45,font:{size:10}}},y:{ticks:{callback:v=>"₹"+(v/1000)+"k"}},y1:{position:"right",max:100,ticks:{callback:v=>v+"%"}}}}});}
   const el2=document.getElementById("rAbcChart");if(el2){if(rAbcChart)rAbcChart.destroy();
     rAbcChart=new Chart(el2,{type:"doughnut",data:{labels:(a.abc||[]).map(x=>"Class "+x.cls),
       datasets:[{data:(a.abc||[]).map(x=>x.value),backgroundColor:["#c0264a","#f5a623","#0f9d58"]}]},
@@ -1733,6 +1790,51 @@ function rmDrawAlerts(){
 }
 /* consumable nav + page wiring (scoped) */
 document.querySelectorAll('#consApp nav .tab[data-p]').forEach(t=>t.onclick=()=>{document.querySelectorAll('#consApp nav .tab').forEach(x=>x.classList.remove("on"));document.querySelectorAll('#consApp .page').forEach(x=>x.classList.remove("on"));t.classList.add("on");document.getElementById(t.dataset.p).classList.add("on");});
+function rmBuildReport(kind){
+  if(!RM_RAW){return;}
+  const out=document.getElementById("rReportOut");
+  const k=RM_RAW.kpi, items=(RM_RAW.items||[]).slice();
+  const today=new Date().toLocaleDateString("en-IN",{day:"numeric",month:"long",year:"numeric"});
+  const kg=n=>Math.round(n||0).toLocaleString("en-IN")+" kg";
+  let h=`<div style="padding:18px 20px">
+    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid var(--ink);padding-bottom:10px;margin-bottom:14px">
+      <div><h2 style="font-size:20px;font-weight:800">SHREE PRESSING — Raw Material</h2>
+      <div style="color:var(--mut);font-size:13px">${kind==='daily'?'Daily Stock Value Report':kind==='weekly'?'Weekly Non-Moving / Dead Stock Report':'Reorder / Shortage List'} · ${today}</div></div>
+      <button class="btn" onclick="window.print()">🖨 Print / Save PDF</button>
+    </div>`;
+  if(kind==='daily'){
+    const byGrade=RM_RAW.categories||[];
+    h+=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:16px">
+      <div style="background:var(--greenbg);border-radius:10px;padding:14px"><div style="color:var(--mut);font-size:12px;font-weight:700">TOTAL STOCK VALUE</div><div style="font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;color:var(--ok)">${inr(k.stock_value)}</div></div>
+      <div style="background:#eef0fb;border-radius:10px;padding:14px"><div style="color:var(--mut);font-size:12px;font-weight:700">STOCK ON SHELF</div><div style="font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;color:var(--indigo)">${kg(k.closing_qty)}</div></div>
+      <div style="background:var(--vlowbg);border-radius:10px;padding:14px"><div style="color:var(--mut);font-size:12px;font-weight:700">BELOW REORDER</div><div style="font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;color:var(--vlow)">${k.below_min} items</div></div>
+    </div>
+    <h3 style="font-size:14px;font-weight:800;margin:10px 0">Stock Value by Material Grade</h3>
+    <table><thead><tr><th>Grade</th><th class="r">Materials</th><th class="r">Closing (kg)</th><th class="r">Stock Value ₹</th><th class="r">Share</th></tr></thead><tbody>`;
+    byGrade.forEach(c=>{h+=`<tr><td><b>${c.category}</b></td><td class="r">${c.items}</td><td class="r">${fmt(Math.round(c.closing))}</td><td class="r">${inr(c.stock_value)}</td><td class="r">${k.stock_value>0?Math.round(c.stock_value/k.stock_value*100):0}%</td></tr>`;});
+    h+=`<tr style="font-weight:800;background:#f3f4f8"><td>TOTAL</td><td class="r">${k.items_tracked}</td><td class="r">${fmt(Math.round(k.closing_qty))}</td><td class="r">${inr(k.stock_value)}</td><td class="r">100%</td></tr></tbody></table>`;
+  } else if(kind==='weekly'){
+    const dead=items.filter(i=>i.dead).sort((a,b)=>b.stock_value-a.stock_value);
+    h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
+      <div style="background:var(--lowbg);border-radius:10px;padding:14px"><div style="color:var(--mut);font-size:12px;font-weight:700">CAPITAL LOCKED IN DEAD STOCK</div><div style="font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;color:var(--low)">${inr(k.dead_stock_value)}</div></div>
+      <div style="background:var(--lowbg);border-radius:10px;padding:14px"><div style="color:var(--mut);font-size:12px;font-weight:700">IDLE QUANTITY · ITEMS</div><div style="font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;color:var(--low)">${kg(k.dead_stock_qty)} · ${k.dead_stock} items</div></div>
+    </div>
+    <h3 style="font-size:14px;font-weight:800;margin:10px 0">Non-Moving / Dead Materials (no issue 60+ days, stock sitting)</h3>
+    <table><thead><tr><th>SKU</th><th>Material</th><th class="r">Closing</th><th class="r">Rate ₹</th><th class="r">Value Locked ₹</th><th class="r">Days Idle</th></tr></thead><tbody>`;
+    if(dead.length)dead.forEach(i=>{h+=`<tr><td class="code">${i.code}</td><td>${i.desc}</td><td class="r">${fmt(i.closing)} ${i.uom}</td><td class="r">${fmt(i.rate)}</td><td class="r"><b>${inr(i.stock_value)}</b></td><td class="r">${i.days_since_issue||"60+"}</td></tr>`;});
+    else h+=`<tr><td colspan="6" class="empty">No dead stock 🎉</td></tr>`;
+    h+=`</tbody></table>`;
+  } else {
+    const ro=(RM_RAW.reorder||[]);
+    h+=`<h3 style="font-size:14px;font-weight:800;margin:10px 0">${ro.length} material(s) below reorder line — soonest to run out first</h3>
+    <table><thead><tr><th>SKU</th><th>Material</th><th class="r">Closing</th><th class="r">Reorder Line</th><th class="r">Days Cover</th><th class="r">Suggest Order</th><th>For Customer</th></tr></thead><tbody>`;
+    if(ro.length)ro.forEach(r=>{h+=`<tr><td class="code">${r.code}</td><td>${r.desc}</td><td class="r">${fmt(r.closing)} ${r.uom}</td><td class="r">${fmt(r.min)}</td><td class="r">${r.days_cover!=null?Math.round(r.days_cover)+"d":"—"}</td><td class="r"><b>${r.suggest?fmt(r.suggest):"—"}</b></td><td>${r.customer||"—"}</td></tr>`;});
+    else h+=`<tr><td colspan="7" class="empty">All materials above reorder line 🎉</td></tr>`;
+    h+=`</tbody></table>`;
+  }
+  h+=`</div>`;
+  out.innerHTML=h;
+}
 /* RM nav + filter wiring */
 document.querySelectorAll('#rmApp nav .tab[data-rp]').forEach(t=>t.onclick=()=>{
   document.querySelectorAll('#rmApp nav .tab').forEach(x=>x.classList.remove("on"));
