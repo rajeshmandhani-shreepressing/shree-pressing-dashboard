@@ -412,6 +412,7 @@
   <div class="tab" data-rp="rmove">🔁 Movement</div>
   <div class="tab" data-rp="rsched">📅 Schedule vs Stock</div>
   <div class="tab" data-rp="rcust">🏷 By Customer</div>
+  <div class="tab" data-rp="rgrn">📥 GRN</div>
   <div class="tab" data-rp="ranalytics">📊 Analytics</div>
   <div class="tab" data-rp="ralerts">🔔 Alerts <span class="navbadge" id="rmAlertBadge" style="display:none">0</span></div>
   <div class="tab" data-rp="rreports">🗂 Reports</div>
@@ -462,7 +463,7 @@
 
   <section class="page" id="rcategory">
     <h1 class="title">Category-Wise Report — for Purchase</h1>
-    <p class="sub">Every raw material grouped into SS · MS · PIPE · EPOXY · BOP. Each category shows stock value, quantity, and how much capital is locked in non-moving / dead stock. Click a row to see its materials.</p>
+    <p class="sub">Every raw material grouped into SS · MS · TUBE · ALUMINIUM · BOP. Each category shows stock value, quantity, and how much capital is locked in non-moving / dead stock. Click a row to see its materials.</p>
     <div class="cards" id="rCatCards"></div>
     <div class="grid2">
       <div class="panel"><h3>Stock Value by Category (₹)</h3><div class="chartbox"><canvas id="rCatValChart"></canvas></div></div>
@@ -513,6 +514,23 @@
     </div></div>
   </section>
 
+  <section class="page" id="rgrn">
+    <h1 class="title">GRN — Goods Received</h1>
+    <p class="sub">Material inward pulled from the TCS GRN file (auto-imported to the sheet). Most recent first.</p>
+    <div class="cards" id="rGrnCards"></div>
+    <div class="grid2">
+      <div class="panel"><h3>Inward Value by Type</h3><div class="chartbox"><canvas id="rGrnTypeChart"></canvas></div></div>
+      <div class="panel"><h3>GRN by Status</h3><div class="chartbox"><canvas id="rGrnStatusChart"></canvas></div></div>
+    </div>
+    <div class="panel"><h3>Recent GRNs</h3>
+      <div class="filters" style="margin:0 0 10px">
+        <input class="search" id="rGrnSearch" placeholder="Search GRN, SKU, material, vendor…">
+      </div>
+      <div style="overflow:auto;max-height:560px">
+        <table id="rGrnTable"><thead><tr><th>Date</th><th>GRN No</th><th>SKU</th><th>Material</th><th>Type</th><th class="r">Qty</th><th class="r">Rate ₹</th><th class="r">Amount ₹</th><th>Vendor</th><th>Status</th></tr></thead><tbody></tbody></table>
+      </div></div>
+  </section>
+
   <section class="page" id="ranalytics">
     <h1 class="title">Analytics</h1>
     <p class="sub">ABC by capital tied up, top value concentration, and slow-moving stock.</p>
@@ -556,10 +574,10 @@
 </div><!-- /rmApp -->
 <script>
 const API_URL = "https://script.google.com/macros/s/AKfycbyF7o8FSC3XqstgD5rwol5DJSgL2nB3gVSHdnvvdG2JtJah7aBVRZbg2u8g1-X9_7BV/exec";   /* consumable Apps Script /exec URL */
-const RM_API_URL = "https://script.google.com/macros/s/AKfycbz-hdfjlQocgNyTWWR4Bt_wecPjneSgENV6ue0fpvp5MiQsRASw-6yacXrtqYSE6yzT/exec";   /* paste the RM-IMS Apps Script /exec URL here to go live (deploy RM_IMS_Dashboard_Code.gs on the RM sheet) */
+const RM_API_URL = "https://script.google.com/macros/s/AKfycbwSvbZCWL5oGNGUiapw-G05-XGBTI4CnC5RuYCvu7u9oVrwUKNqvkMvZET1TUviUn_B/exec";   /* paste the RM-IMS Apps Script /exec URL here to go live (deploy RM_IMS_Dashboard_Code.gs on the RM sheet) */
 let TOKEN = null;     // set after login (kept in memory only); shared by BOTH dashboards
 let RM_RAW=null, rmTimer=null, rItemFilter="all", rMoveFilter="all", rSchedFilter="all", rAlertFilter="all";
-let rGradeChart,rHealthChart,rGradeBar,rParetoChart,rAbcChart,rCatValChart,rCatMoveChart;
+let rGradeChart,rHealthChart,rGradeBar,rParetoChart,rAbcChart,rCatValChart,rCatMoveChart,rGrnTypeChart,rGrnStatusChart;
 let RAW=null, mode="cost", itemFilter="all", alertFilter="all", abcFilter="all", timer=null, catChart,healthChart,weekChart,paretoChart,abcChart,trendCostChart,trendQtyChart,svaChart;
 const inr=n=>"₹"+Math.round(n||0).toLocaleString("en-IN");
 const cls=s=>(s||"").replace(/\s+/g,"");
@@ -1570,7 +1588,18 @@ function rmSample(){
     items,categories:roll(),customers:Object.values(custMap).sort((a,b)=>b.rm_kg-a.rm_kg),
     reorder:vlow.concat(low).map(i=>({code:i.code,desc:i.desc,closing:i.closing,uom:i.uom,min:i.min,days_cover:i.days_cover,reorder_qty:i.reorder_qty,suggest:i.suggest_order,place:i.place_order,customer:i.customer})).sort((a,b)=>(a.days_cover||999)-(b.days_cover||999)),
     alerts,analytics:{pareto,abc:[ag("A"),ag("B"),ag("C")],slow_movers:slow,plan_vs_actual:pva,dead_value:items.filter(i=>i.dead).reduce((s,i)=>s+i.stock_value,0)},
-    schedule:items.filter(i=>i.planned_req>0).map(i=>({sku:i.code,customer:i.customer,fg:i.where_used,nos:0,rm:i.desc,req_kg:i.planned_req}))};
+    schedule:items.filter(i=>i.planned_req>0).map(i=>({sku:i.code,customer:i.customer,fg:i.where_used,nos:0,rm:i.desc,req_kg:i.planned_req})),
+    grn:{lines:5,inward_value:1287000,
+      by_status:{Approved:3,Released:1,Rejected:1},
+      by_type:[{type:"SS",lines:2,value:553000},{type:"MS",lines:2,value:680000},{type:"BOP",lines:1,value:54000}],
+      rejected:[{date:"2026-06-12",grn:"GRN/RM/0626/0142",code:"SKUHR12",name:"HR 2.50 X 1250",type:"MS",status:"Rejected",qty:500,uom:"Kgs",rate:62,amount:31000,vendor:"Jindal Steel",bill:"JS/2231"}],
+      recent:[
+        {date:"2026-06-15",grn:"GRN/RM/0626/0150",code:"SKUSS1",name:"SS 0.15 X 150",type:"SS",status:"Approved",qty:1200,uom:"Kgs",rate:235,amount:282000,vendor:"Jindal Stainless",bill:"JSL/8841"},
+        {date:"2026-06-14",grn:"GRN/RM/0626/0148",code:"SKUCR8",name:"CRCA 0.80 X 1250",type:"MS",status:"Approved",qty:4000,uom:"Kgs",rate:58,amount:232000,vendor:"Tata Steel",bill:"TS/5521"},
+        {date:"2026-06-13",grn:"GRN/RM/0626/0146",code:"SKUSS4",name:"SS 0.15 X 163",type:"SS",status:"Released",qty:2300,uom:"Kgs",rate:235,amount:540500,vendor:"Jindal Stainless",bill:"JSL/8830"},
+        {date:"2026-06-12",grn:"GRN/RM/0626/0142",code:"SKUHR12",name:"HR 2.50 X 1250",type:"MS",status:"Rejected",qty:500,uom:"Kgs",rate:62,amount:31000,vendor:"Jindal Steel",bill:"JS/2231"},
+        {date:"2026-06-11",grn:"GRN/RM/0626/0138",code:"SKUALU2",name:"Alum 4.00 X 105 X 1220",type:"ALUMINIUM",status:"Approved",qty:161,uom:"Kgs",rate:242,amount:38962,vendor:"Hindalco",bill:"HL/1190"}
+      ]}};
 }
 function rmSetStatus(s){const d=document.getElementById("rdot"),t=document.getElementById("rstatustext");
   d.className="live-dot"+(s==="live"?" on":"");
@@ -1596,12 +1625,13 @@ const RM_FSN={FAST:30,SLOW:45,NONMOVING:90};
 function rmCategoryOf(name){
   const U=(""+(name||"")).trim().toUpperCase(); if(!U) return "OTHER";
   const first=U.split(/\s+/)[0]||"";
-  if(/\bPIPE\b/.test(U)||/\bTUBE\b/.test(U)) return "PIPE";
-  if(U.indexOf("EPOXY")>=0||first==="YELLOW"||first==="GREEN") return "EPOXY";
-  const bop=["SENSOR","STOPPER","BUSH","RING","WASHER","WELD","BOLT","HEX","NUT","UNC","MATWOOL","GLASSWOOL","RESONATOR","INBUILT","INTEL","GASKET","CLIP","STUD"];
+  if(/\bTUBE\b/.test(U)||/\bPIPE\b/.test(U)) return "TUBE";
+  if(first.indexOf("ALUM")===0||(first.indexOf("AL")===0&&first.length<=4)) return "ALUMINIUM";
+  const bop=["SENSOR","STOPPER","BUSH","RING","WASHER","WELD","BOLT","HEX","NUT","UNC","MATWOOL","GLASSWOOL","RESONATOR","INBUILT","INTEL","GASKET","CLIP","STUD","EPOXY"];
   for(const b of bop){ if(U.indexOf(b)>=0) return "BOP"; }
+  if(first==="YELLOW"||first==="GREEN") return "BOP";
   if(first.indexOf("SS")===0) return "SS";
-  if(first.indexOf("HR")===0||first.indexOf("CR")===0||first.indexOf("BSK")===0||first.indexOf("SAPH")===0||first.indexOf("HSLA")===0||(first.indexOf("ST")===0&&/^ST\d/.test(first))||first.indexOf("E34")===0||first.indexOf("E250")===0||first.indexOf("SA1D")===0||first.indexOf("ALUM")===0||(first.indexOf("AL")===0&&first.length<=4)||first.indexOf("MS")===0) return "MS";
+  if(first.indexOf("HR")===0||first.indexOf("CR")===0||first.indexOf("BSK")===0||first.indexOf("SAPH")===0||first.indexOf("HSLA")===0||(first.indexOf("ST")===0&&/^ST\d/.test(first))||first.indexOf("E34")===0||first.indexOf("E250")===0||first.indexOf("SA1D")===0||first.indexOf("MS")===0) return "MS";
   return "OTHER";
 }
 function rmFsnClass(daysSinceOut,closing){
@@ -1655,7 +1685,7 @@ function rmNormalize(d){
 function rmRenderAll(){
   RM_RAW=rmNormalize(RM_RAW);
   document.getElementById("rupdated").textContent=new Date(RM_RAW.updated).toLocaleTimeString("en-IN");
-  rmRenderDash();rmRenderItems();rmRenderMove();rmRenderSched();rmRenderCust();rmRenderCategory();rmRenderAnalytics();rmRenderAlerts();
+  rmRenderDash();rmRenderItems();rmRenderMove();rmRenderSched();rmRenderCust();rmRenderCategory();rmRenderGrn();rmRenderAnalytics();rmRenderAlerts();
 }
 function rmGoItems(filter){
   // jump to Materials tab pre-filtered. filter: all|VERY LOW|LOW|OK|over|dead
@@ -1816,6 +1846,48 @@ function rmRenderCategory(){
   document.querySelector("#rMoveSummaryTable tbody").innerHTML=mv.map(m=>`<tr>
     <td><b>P${m.priority}</b></td><td>${m.cls}</td><td style="color:var(--mut)">${rule[m.cls]||""}</td>
     <td class="r">${m.items}</td><td class="r">${fmt(m.qty)}</td><td class="r">${inr(m.value)}</td></tr>`).join("");
+}
+function rmRenderGrn(){
+  const g=RM_RAW.grn||{recent:[],by_status:{},by_type:[],inward_value:0,lines:0};
+  const recent=g.recent||[];
+  const thisMonth=new Date().toISOString().slice(0,7);
+  const moLines=recent.filter(r=>(r.date||"").slice(0,7)===thisMonth);
+  const moVal=moLines.reduce((s,r)=>s+(r.amount||0),0);
+  const rej=(g.rejected||recent.filter(r=>(r.status||"").toLowerCase().includes("reject")));
+  document.getElementById("rGrnCards").innerHTML=[
+    rcard("Inward This Month",inr(moVal),moLines.length+" line(s)","green","📥"),
+    rcard("Total Inward Value",inr(g.inward_value||0),(g.lines||0)+" GRN line(s)","indigo","₹"),
+    rcard("Rejected",rej.length,"GRN lines rejected","red","⛔"),
+    rcard("Total GRN Lines",(g.lines||0).toLocaleString("en-IN"),"all imported","green","🧾")].join("");
+  // type chart
+  const types=g.by_type||[];
+  const elT=document.getElementById("rGrnTypeChart");
+  if(elT){ if(rGrnTypeChart)rGrnTypeChart.destroy();
+    rGrnTypeChart=new Chart(elT,{type:"doughnut",data:{labels:types.map(t=>t.type),
+      datasets:[{data:types.map(t=>Math.round(t.value)),backgroundColor:pal}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"right",labels:{boxWidth:12,font:{size:11}}},
+        tooltip:{callbacks:{label:c=>c.label+": "+inr(c.parsed)}}}}}); }
+  // status chart
+  const st=g.by_status||{}; const sk=Object.keys(st);
+  const elS=document.getElementById("rGrnStatusChart");
+  if(elS){ if(rGrnStatusChart)rGrnStatusChart.destroy();
+    const cmap={Approved:"#0f9d58",Released:"#5b5bd6",Rejected:"#c0264a"};
+    rGrnStatusChart=new Chart(elS,{type:"bar",data:{labels:sk,
+      datasets:[{label:"GRN lines",data:sk.map(k=>st[k]),backgroundColor:sk.map(k=>cmap[k]||"#7b7be0"),borderRadius:6}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}}); }
+  rmDrawGrn();
+}
+function rmDrawGrn(){
+  const q=(document.getElementById("rGrnSearch").value||"").toLowerCase();
+  let rows=(RM_RAW.grn&&RM_RAW.grn.recent)||[];
+  if(q)rows=rows.filter(r=>(r.grn+" "+r.code+" "+r.name+" "+r.vendor+" "+r.type).toLowerCase().includes(q));
+  const sp=s=>{const c=(s||"").toLowerCase().includes("reject")?"#c0264a":(s||"").toLowerCase().includes("releas")?"#5b5bd6":"#0f9d58";
+    return `<span style="background:${c};color:#fff;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:800">${s||"—"}</span>`;};
+  document.querySelector("#rGrnTable tbody").innerHTML=rows.length?rows.map(r=>`<tr class="${(r.status||'').toLowerCase().includes('reject')?'alertrow':''}">
+    <td>${r.date||"—"}</td><td class="code">${r.grn||"—"}</td><td class="code">${r.code||"—"}</td><td>${r.name||""}</td>
+    <td>${r.type||""}</td><td class="r">${fmt(r.qty)} ${r.uom||""}</td><td class="r">${fmt(r.rate)}</td>
+    <td class="r"><b>${inr(r.amount)}</b></td><td>${r.vendor||"—"}</td><td>${sp(r.status)}</td></tr>`).join("")
+    :`<tr><td colspan="10" class="empty">No GRN data yet. Run “Import RM GRN from Drive” on the sheet.</td></tr>`;
 }
 function rmRenderMove(){
   const it=RM_RAW.items||[];
@@ -1980,6 +2052,7 @@ document.getElementById("rItemSearch").oninput=rmDrawItems;
 document.getElementById("rMoveSearch").oninput=rmDrawMove;
 document.getElementById("rMoveType").onchange=rmDrawMove;
 document.getElementById("rSchedSearch").oninput=rmDrawSched;
+document.getElementById("rGrnSearch").oninput=rmDrawGrn;
 document.getElementById("rauto").onchange=e=>{if(e.target.checked)startRmAuto();else clearInterval(rmTimer);};
 document.getElementById("rlogoutBtn").onclick=logout;
 /* portal wiring */
