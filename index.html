@@ -408,6 +408,7 @@
   <div class="tab" data-portal="1" style="font-weight:800;color:var(--indigo)">⮜ Portal</div>
   <div class="tab on" data-rp="rdash">📈 Dashboard</div>
   <div class="tab" data-rp="ritems">🪨 Materials</div>
+  <div class="tab" data-rp="rcategory">📦 Category Report</div>
   <div class="tab" data-rp="rmove">🔁 Movement</div>
   <div class="tab" data-rp="rsched">📅 Schedule vs Stock</div>
   <div class="tab" data-rp="rcust">🏷 By Customer</div>
@@ -448,10 +449,30 @@
       <div class="chip" data-rf="OK">Healthy <span class="b" id="rcOK">0</span></div>
       <div class="chip" data-rf="over">Overstock <span class="b" id="rcOV">0</span></div>
       <div class="chip" data-rf="dead">Dead <span class="b" id="rcDS">0</span></div>
+      <span style="width:1px;background:#e2e2ee;align-self:stretch;margin:0 2px"></span>
+      <div class="chip" data-rf="FAST">🟢 Fast P1 <span class="b" id="rcFA">0</span></div>
+      <div class="chip" data-rf="SLOW">🟡 Slow P2 <span class="b" id="rcSL">0</span></div>
+      <div class="chip" data-rf="NON-MOVING">🟠 Non-Moving P3 <span class="b" id="rcNM">0</span></div>
       <input class="search" id="rItemSearch" placeholder="Search SKU, material, customer, where used…">
     </div>
     <div class="panel"><div style="overflow:auto;max-height:620px">
-      <table id="rItemsTable"><thead><tr><th>SKU</th><th>Material</th><th>UOM</th><th class="r">Rate ₹</th><th class="r">Received</th><th class="r">Issued</th><th class="r">Closing</th><th class="r">In Transit</th><th class="r">Stock Value ₹</th><th class="r">ADC</th><th class="r">Days Cover</th><th class="r">Reorder Line</th><th>Status</th><th>ABC</th></tr></thead><tbody></tbody></table>
+      <table id="rItemsTable"><thead><tr><th>SKU</th><th>Material</th><th>Category</th><th>UOM</th><th class="r">Rate ₹</th><th class="r">Received</th><th class="r">Issued</th><th class="r">Closing</th><th class="r">In Transit</th><th class="r">Stock Value ₹</th><th class="r">ADC</th><th class="r">Days Cover</th><th class="r">Last Issue</th><th>Movement</th><th>Status</th><th>ABC</th></tr></thead><tbody></tbody></table>
+    </div></div>
+  </section>
+
+  <section class="page" id="rcategory">
+    <h1 class="title">Category-Wise Report — for Purchase</h1>
+    <p class="sub">Every raw material grouped into SS · MS · PIPE · EPOXY · BOP. Each category shows stock value, quantity, and how much capital is locked in non-moving / dead stock. Click a row to see its materials.</p>
+    <div class="cards" id="rCatCards"></div>
+    <div class="grid2">
+      <div class="panel"><h3>Stock Value by Category (₹)</h3><div class="chartbox"><canvas id="rCatValChart"></canvas></div></div>
+      <div class="panel"><h3>Movement Mix by Category</h3><div class="chartbox"><canvas id="rCatMoveChart"></canvas></div></div>
+    </div>
+    <div class="panel"><h3>Category Summary</h3><div style="overflow:auto;max-height:420px">
+      <table id="rCatTable"><thead><tr><th>Category</th><th class="r">Items</th><th class="r">Closing Qty</th><th class="r">Stock Value ₹</th><th class="r">Fast</th><th class="r">Slow</th><th class="r">Non-Moving</th><th class="r">Dead</th><th class="r">Locked ₹</th></tr></thead><tbody></tbody></table>
+    </div></div>
+    <div class="panel"><h3>Movement Priority — quantity & value locked (FSN)</h3><div style="overflow:auto">
+      <table id="rMoveSummaryTable"><thead><tr><th>Priority</th><th>Class</th><th>Rule</th><th class="r">Items</th><th class="r">Quantity (Kg)</th><th class="r">Stock Value ₹</th></tr></thead><tbody></tbody></table>
     </div></div>
   </section>
 
@@ -535,10 +556,10 @@
 </div><!-- /rmApp -->
 <script>
 const API_URL = "https://script.google.com/macros/s/AKfycbyF7o8FSC3XqstgD5rwol5DJSgL2nB3gVSHdnvvdG2JtJah7aBVRZbg2u8g1-X9_7BV/exec";   /* consumable Apps Script /exec URL */
-const RM_API_URL = "https://script.google.com/macros/s/AKfycbxxhBy48_89Kzk6UbpTXsq1Bhf9g4CILNgA4yuw8R3dQc8sCe4jnIRKuI5yoFGAbDJi0Q/exec";   /* paste the RM-IMS Apps Script /exec URL here to go live (deploy RM_IMS_Dashboard_Code.gs on the RM sheet) */
+const RM_API_URL = "https://script.google.com/macros/s/AKfycbz-hdfjlQocgNyTWWR4Bt_wecPjneSgENV6ue0fpvp5MiQsRASw-6yacXrtqYSE6yzT/exec";   /* paste the RM-IMS Apps Script /exec URL here to go live (deploy RM_IMS_Dashboard_Code.gs on the RM sheet) */
 let TOKEN = null;     // set after login (kept in memory only); shared by BOTH dashboards
 let RM_RAW=null, rmTimer=null, rItemFilter="all", rMoveFilter="all", rSchedFilter="all", rAlertFilter="all";
-let rGradeChart,rHealthChart,rGradeBar,rParetoChart,rAbcChart;
+let rGradeChart,rHealthChart,rGradeBar,rParetoChart,rAbcChart,rCatValChart,rCatMoveChart;
 let RAW=null, mode="cost", itemFilter="all", alertFilter="all", abcFilter="all", timer=null, catChart,healthChart,weekChart,paretoChart,abcChart,trendCostChart,trendQtyChart,svaChart;
 const inr=n=>"₹"+Math.round(n||0).toLocaleString("en-IN");
 const cls=s=>(s||"").replace(/\s+/g,"");
@@ -1567,9 +1588,74 @@ async function rmLoad(){
   rmRenderAll();
 }
 function startRmAuto(){clearInterval(rmTimer);rmTimer=setInterval(rmLoad,10000);}
+
+/* ---- Category taxonomy + FSN movement: mirror of the RM API, applied
+   client-side so the dashboard shows the same buckets even on the older
+   API or sample data. Touches RM_RAW only — consumables untouched. ---- */
+const RM_FSN={FAST:30,SLOW:45,NONMOVING:90};
+function rmCategoryOf(name){
+  const U=(""+(name||"")).trim().toUpperCase(); if(!U) return "OTHER";
+  const first=U.split(/\s+/)[0]||"";
+  if(/\bPIPE\b/.test(U)||/\bTUBE\b/.test(U)) return "PIPE";
+  if(U.indexOf("EPOXY")>=0||first==="YELLOW"||first==="GREEN") return "EPOXY";
+  const bop=["SENSOR","STOPPER","BUSH","RING","WASHER","WELD","BOLT","HEX","NUT","UNC","MATWOOL","GLASSWOOL","RESONATOR","INBUILT","INTEL","GASKET","CLIP","STUD"];
+  for(const b of bop){ if(U.indexOf(b)>=0) return "BOP"; }
+  if(first.indexOf("SS")===0) return "SS";
+  if(first.indexOf("HR")===0||first.indexOf("CR")===0||first.indexOf("BSK")===0||first.indexOf("SAPH")===0||first.indexOf("HSLA")===0||(first.indexOf("ST")===0&&/^ST\d/.test(first))||first.indexOf("E34")===0||first.indexOf("E250")===0||first.indexOf("SA1D")===0||first.indexOf("ALUM")===0||(first.indexOf("AL")===0&&first.length<=4)||first.indexOf("MS")===0) return "MS";
+  return "OTHER";
+}
+function rmFsnClass(daysSinceOut,closing){
+  if(daysSinceOut==null) return closing>0?"NON-MOVING":"FAST";
+  if(daysSinceOut<=RM_FSN.FAST) return "FAST";
+  if(daysSinceOut<=RM_FSN.SLOW) return "SLOW";
+  if(daysSinceOut<=RM_FSN.NONMOVING) return "NON-MOVING";
+  return closing>0?"DEAD":"FAST";
+}
+function rmNormalize(d){
+  if(!d||!d.items) return d;
+  (d.items||[]).forEach(i=>{
+    // Re-bucket into the 5 purchase-team categories; keep the fine grade as `grade`.
+    if(!i.grade) i.grade=i.type||i.category;
+    i.category=rmCategoryOf(i.desc||i.system_name||i.short);
+    // FSN movement class from days since last issue (falls back to existing field).
+    if(!i.movement_class){
+      const dso=(i.days_since_issue!=null?i.days_since_issue:null);
+      i.movement_class=rmFsnClass(dso,i.closing);
+    }
+    i.movement_priority=i.movement_class==="FAST"?1:(i.movement_class==="SLOW"?2:3);
+    i.non_moving=(i.movement_class==="NON-MOVING"||i.movement_class==="DEAD");
+    i.dead=(i.movement_class==="DEAD");
+  });
+  // Rebuild category rollup on the new buckets (with non-moving/dead value).
+  const g={};
+  d.items.forEach(it=>{const c=it.category||"OTHER";
+    if(!g[c])g[c]={category:c,items:0,stock_value:0,closing:0,issued:0,received:0,non_moving_value:0,dead_value:0,fast:0,slow:0,nonmoving:0,deadn:0};
+    g[c].items++;g[c].stock_value+=it.stock_value;g[c].closing+=it.closing;g[c].issued+=it.issued;g[c].received+=it.received;
+    if(it.movement_class==="NON-MOVING"){g[c].nonmoving++;g[c].non_moving_value+=it.stock_value;}
+    if(it.movement_class==="DEAD"){g[c].deadn++;g[c].dead_value+=it.stock_value;}
+    if(it.movement_class==="FAST")g[c].fast++; if(it.movement_class==="SLOW")g[c].slow++;});
+  d.categories=Object.values(g).sort((a,b)=>b.stock_value-a.stock_value);
+  // Movement (FSN) rollup with Kg + ₹.
+  const order=["FAST","SLOW","NON-MOVING","DEAD"],mg={};
+  order.forEach(k=>mg[k]={cls:k,items:0,qty:0,value:0,priority:k==="FAST"?1:(k==="SLOW"?2:3)});
+  d.items.forEach(it=>{const m=mg[it.movement_class];if(m&&it.closing>0){m.items++;m.qty+=it.closing;m.value+=it.stock_value;}});
+  d.movement=order.map(k=>mg[k]);
+  // KPI top-ups for non-moving/dead locked capital.
+  const nm=d.items.filter(i=>i.movement_class==="NON-MOVING"),dd=d.items.filter(i=>i.movement_class==="DEAD");
+  const sV=a=>a.reduce((s,i)=>s+i.stock_value,0),sQ=a=>a.reduce((s,i)=>s+i.closing,0);
+  d.kpi=d.kpi||{};
+  d.kpi.fast_count=d.items.filter(i=>i.movement_class==="FAST").length;
+  d.kpi.slow_count=d.items.filter(i=>i.movement_class==="SLOW").length;
+  d.kpi.non_moving_count=nm.length; d.kpi.non_moving_qty=sQ(nm); d.kpi.non_moving_value=sV(nm);
+  d.kpi.dead_stock=dd.length; d.kpi.dead_stock_qty=sQ(dd); d.kpi.dead_stock_value=sV(dd);
+  d.kpi.locked_count=nm.length+dd.length; d.kpi.locked_qty=sQ(nm)+sQ(dd); d.kpi.locked_value=sV(nm)+sV(dd);
+  return d;
+}
+
 function rmRenderAll(){
+  RM_RAW=rmNormalize(RM_RAW);
   document.getElementById("rupdated").textContent=new Date(RM_RAW.updated).toLocaleTimeString("en-IN");
-  rmRenderDash();rmRenderItems();rmRenderMove();rmRenderSched();rmRenderCust();rmRenderAnalytics();rmRenderAlerts();
+  rmRenderDash();rmRenderItems();rmRenderMove();rmRenderSched();rmRenderCust();rmRenderCategory();rmRenderAnalytics();rmRenderAlerts();
 }
 function rmGoItems(filter){
   // jump to Materials tab pre-filtered. filter: all|VERY LOW|LOW|OK|over|dead
@@ -1666,25 +1752,70 @@ function rmRenderItems(){
   document.getElementById("rcLO").textContent=cnt(i=>i.status==="LOW");
   document.getElementById("rcOK").textContent=cnt(i=>i.status==="OK");
   document.getElementById("rcOV").textContent=cnt(i=>i.overstock);
-  document.getElementById("rcDS").textContent=cnt(i=>i.dead);
+  document.getElementById("rcDS").textContent=cnt(i=>i.movement_class==="DEAD");
+  const setT=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+  setT("rcFA",cnt(i=>i.movement_class==="FAST"));
+  setT("rcSL",cnt(i=>i.movement_class==="SLOW"));
+  setT("rcNM",cnt(i=>i.movement_class==="NON-MOVING"));
   rmDrawItems();
 }
 function rmDrawItems(){
   const q=(document.getElementById("rItemSearch").value||"").toLowerCase();
   let it=(RM_RAW.items||[]).slice();
-  if(rItemFilter==="dead")it=it.filter(i=>i.dead);
+  if(rItemFilter==="dead")it=it.filter(i=>i.movement_class==="DEAD");
   else if(rItemFilter==="over")it=it.filter(i=>i.overstock);
+  else if(["FAST","SLOW","NON-MOVING"].includes(rItemFilter))it=it.filter(i=>i.movement_class===rItemFilter);
   else if(rItemFilter!=="all")it=it.filter(i=>i.status===rItemFilter);
   if(q)it=it.filter(i=>(i.code+" "+i.desc+" "+(i.category||"")+" "+(i.customer||"")+" "+(i.where_used||"")).toLowerCase().includes(q));
   it.sort((a,b)=>b.stock_value-a.stock_value);
+  const mvPill=c=>{const col=c==="DEAD"?"#c0264a":c==="NON-MOVING"?"#e67e22":c==="SLOW"?"#f5a623":"#0f9d58";
+    const lab=c==="FAST"?"Fast P1":c==="SLOW"?"Slow P2":c==="NON-MOVING"?"Non-Mov P3":"Dead P3";
+    return `<span style="background:${col};color:#fff;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:800">${lab}</span>`;};
   document.querySelector("#rItemsTable tbody").innerHTML=it.map(i=>`<tr class="${i.status==='VERY LOW'?'alertrow':''}">
-    <td class="code">${i.code}</td><td>${i.desc}</td><td>${i.uom}</td>
+    <td class="code">${i.code}</td><td>${i.desc}</td><td><b>${i.category}</b></td><td>${i.uom}</td>
     <td class="r">${fmt(i.rate)}</td><td class="r">${fmt(i.received)}</td><td class="r">${fmt(i.issued)}</td>
     <td class="r"><b>${fmt(i.closing)}</b></td><td class="r">${i.in_transit?fmt(i.in_transit):"—"}</td>
     <td class="r">${inr(i.stock_value)}</td><td class="r">${fmt(i.adc)}</td>
-    <td class="r">${i.days_cover!=null?Math.round(i.days_cover)+"d":"—"}</td><td class="r">${fmt(i.reorder_point)}</td>
+    <td class="r">${i.days_cover!=null?Math.round(i.days_cover)+"d":"—"}</td>
+    <td class="r">${i.days_since_issue!=null?i.days_since_issue+"d ago":"never"}</td>
+    <td>${mvPill(i.movement_class)}</td>
     <td><span class="pill ${cls(i.status)}">${i.status}</span></td><td><span class="abc ${i.abc}">${i.abc}</span></td></tr>`).join("")
-    ||`<tr><td colspan="14" class="empty">No materials match.</td></tr>`;
+    ||`<tr><td colspan="16" class="empty">No materials match.</td></tr>`;
+}
+function rmRenderCategory(){
+  const cats=RM_RAW.categories||[], mv=RM_RAW.movement||[], k=RM_RAW.kpi;
+  const kg=n=>Math.round(n||0).toLocaleString("en-IN")+" kg";
+  // KPI cards: locked capital + fast/slow/non-moving counts
+  document.getElementById("rCatCards").innerHTML=[
+    rcard("Locked Capital (Non-Moving + Dead)",inr(k.locked_value||0),(k.locked_count||0)+" items · "+kg(k.locked_qty),"red","🔒"),
+    rcard("Non-Moving",inr(k.non_moving_value||0),(k.non_moving_count||0)+" items · "+kg(k.non_moving_qty),"amber","🟠","NON-MOVING"),
+    rcard("Dead Stock",inr(k.dead_stock_value||0),(k.dead_stock||0)+" items · "+kg(k.dead_stock_qty),"red","🗄","dead"),
+    rcard("Fast Moving (P1)",(k.fast_count||0),"healthy turnover","green","🟢","FAST")].join("");
+  // value donut
+  rmDonut("rCatValChart",rCatValChart,cats.map(c=>c.category),cats.map(c=>Math.round(c.stock_value)),v=>rCatValChart=v);
+  // movement stacked bar per category
+  const el=document.getElementById("rCatMoveChart");
+  if(el){ if(rCatMoveChart)rCatMoveChart.destroy();
+    rCatMoveChart=new Chart(el,{type:"bar",data:{labels:cats.map(c=>c.category),
+      datasets:[
+        {label:"Fast",data:cats.map(c=>c.fast||0),backgroundColor:"#0f9d58"},
+        {label:"Slow",data:cats.map(c=>c.slow||0),backgroundColor:"#f5a623"},
+        {label:"Non-Moving",data:cats.map(c=>c.nonmoving||0),backgroundColor:"#e67e22"},
+        {label:"Dead",data:cats.map(c=>c.deadn||0),backgroundColor:"#c0264a"}]},
+      options:{responsive:true,maintainAspectRatio:false,
+        scales:{x:{stacked:true},y:{stacked:true}},plugins:{legend:{position:"bottom"}}}});
+  }
+  // category table
+  document.querySelector("#rCatTable tbody").innerHTML=cats.map(c=>`<tr style="cursor:pointer" onclick="rmGoItemsSearch('${c.category}')">
+    <td><b>${c.category}</b></td><td class="r">${c.items}</td><td class="r">${fmt(c.closing)}</td>
+    <td class="r">${inr(c.stock_value)}</td><td class="r">${c.fast||0}</td><td class="r">${c.slow||0}</td>
+    <td class="r">${c.nonmoving||0}</td><td class="r">${c.deadn||0}</td>
+    <td class="r" style="color:#c0264a;font-weight:700">${inr((c.non_moving_value||0)+(c.dead_value||0))}</td></tr>`).join("");
+  // movement priority summary
+  const rule={FAST:"Issued ≤30 days",SLOW:"Last issue 31–45 days","NON-MOVING":"Last issue 46–90 days",DEAD:"No issue 90+ days, stock on hand"};
+  document.querySelector("#rMoveSummaryTable tbody").innerHTML=mv.map(m=>`<tr>
+    <td><b>P${m.priority}</b></td><td>${m.cls}</td><td style="color:var(--mut)">${rule[m.cls]||""}</td>
+    <td class="r">${m.items}</td><td class="r">${fmt(m.qty)}</td><td class="r">${inr(m.value)}</td></tr>`).join("");
 }
 function rmRenderMove(){
   const it=RM_RAW.items||[];
@@ -1814,15 +1945,16 @@ function rmBuildReport(kind){
     byGrade.forEach(c=>{h+=`<tr><td><b>${c.category}</b></td><td class="r">${c.items}</td><td class="r">${fmt(Math.round(c.closing))}</td><td class="r">${inr(c.stock_value)}</td><td class="r">${k.stock_value>0?Math.round(c.stock_value/k.stock_value*100):0}%</td></tr>`;});
     h+=`<tr style="font-weight:800;background:#f3f4f8"><td>TOTAL</td><td class="r">${k.items_tracked}</td><td class="r">${fmt(Math.round(k.closing_qty))}</td><td class="r">${inr(k.stock_value)}</td><td class="r">100%</td></tr></tbody></table>`;
   } else if(kind==='weekly'){
-    const dead=items.filter(i=>i.dead).sort((a,b)=>b.stock_value-a.stock_value);
+    const dead=items.filter(i=>i.movement_class==="DEAD"||i.movement_class==="NON-MOVING").sort((a,b)=>b.stock_value-a.stock_value);
+    const lockedVal=k.locked_value||k.dead_stock_value||0, lockedQty=k.locked_qty||k.dead_stock_qty||0, lockedN=k.locked_count||k.dead_stock||0;
     h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
-      <div style="background:var(--lowbg);border-radius:10px;padding:14px"><div style="color:var(--mut);font-size:12px;font-weight:700">CAPITAL LOCKED IN DEAD STOCK</div><div style="font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;color:var(--low)">${inr(k.dead_stock_value)}</div></div>
-      <div style="background:var(--lowbg);border-radius:10px;padding:14px"><div style="color:var(--mut);font-size:12px;font-weight:700">IDLE QUANTITY · ITEMS</div><div style="font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;color:var(--low)">${kg(k.dead_stock_qty)} · ${k.dead_stock} items</div></div>
+      <div style="background:var(--lowbg);border-radius:10px;padding:14px"><div style="color:var(--mut);font-size:12px;font-weight:700">CAPITAL LOCKED (NON-MOVING + DEAD)</div><div style="font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;color:var(--low)">${inr(lockedVal)}</div></div>
+      <div style="background:var(--lowbg);border-radius:10px;padding:14px"><div style="color:var(--mut);font-size:12px;font-weight:700">IDLE QUANTITY · ITEMS</div><div style="font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;color:var(--low)">${kg(lockedQty)} · ${lockedN} items</div></div>
     </div>
-    <h3 style="font-size:14px;font-weight:800;margin:10px 0">Non-Moving / Dead Materials (no issue 60+ days, stock sitting)</h3>
-    <table><thead><tr><th>SKU</th><th>Material</th><th class="r">Closing</th><th class="r">Rate ₹</th><th class="r">Value Locked ₹</th><th class="r">Days Idle</th></tr></thead><tbody>`;
-    if(dead.length)dead.forEach(i=>{h+=`<tr><td class="code">${i.code}</td><td>${i.desc}</td><td class="r">${fmt(i.closing)} ${i.uom}</td><td class="r">${fmt(i.rate)}</td><td class="r"><b>${inr(i.stock_value)}</b></td><td class="r">${i.days_since_issue||"60+"}</td></tr>`;});
-    else h+=`<tr><td colspan="6" class="empty">No dead stock 🎉</td></tr>`;
+    <h3 style="font-size:14px;font-weight:800;margin:10px 0">Non-Moving (46–90d) & Dead (90+d) Materials — capital sitting idle</h3>
+    <table><thead><tr><th>SKU</th><th>Material</th><th>Category</th><th class="r">Closing</th><th class="r">Rate ₹</th><th class="r">Value Locked ₹</th><th class="r">Days Idle</th><th>Class</th></tr></thead><tbody>`;
+    if(dead.length)dead.forEach(i=>{h+=`<tr><td class="code">${i.code}</td><td>${i.desc}</td><td>${i.category}</td><td class="r">${fmt(i.closing)} ${i.uom}</td><td class="r">${fmt(i.rate)}</td><td class="r"><b>${inr(i.stock_value)}</b></td><td class="r">${i.days_since_issue!=null?i.days_since_issue:"never"}</td><td>${i.movement_class}</td></tr>`;});
+    else h+=`<tr><td colspan="8" class="empty">No non-moving or dead stock 🎉</td></tr>`;
     h+=`</tbody></table>`;
   } else {
     const ro=(RM_RAW.reorder||[]);
