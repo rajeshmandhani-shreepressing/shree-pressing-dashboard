@@ -27,38 +27,53 @@
   .live-dot.on{background:var(--green);animation:p 2s infinite}
   @keyframes p{0%{box-shadow:0 0 0 0 rgba(15,157,88,.5)}70%{box-shadow:0 0 0 7px rgba(15,157,88,0)}100%{box-shadow:0 0 0 0 rgba(15,157,88,0)}}
   main{max-width:1500px;margin:0 auto;padding:22px}
-  /* ===== Consumable app: VERTICAL left sidebar nav (scoped, RM untouched) ===== */
-  #consApp > .topbar{display:none}
-  #consApp > nav{
+  /* ===== VERTICAL left sidebar nav — shared by Consumable AND RM apps ===== */
+  #consApp > .topbar,
+  #rmApp > .topbar{display:none}
+  #consApp > nav,
+  #rmApp > nav{
     position:fixed;top:0;left:0;bottom:0;width:212px;
     flex-direction:column;align-items:stretch;flex-wrap:nowrap;gap:2px;
     padding:16px 12px 18px;border-bottom:none;border-right:1px solid var(--line);
     overflow-y:auto;z-index:30;background:var(--card)
   }
-  #consApp > nav .sp-logo-light{height:34px!important;width:150px!important;margin:2px 4px 14px!important}
-  #consApp > nav .tab{
+  #consApp > nav .sp-logo-light,
+  #rmApp > nav .sp-logo-light{height:34px!important;width:150px!important;margin:2px 4px 14px!important}
+  #consApp > nav .tab,
+  #rmApp > nav .tab{
     padding:11px 13px;border-bottom:none;border-radius:9px;font-size:14px;
     border-left:3px solid transparent
   }
-  #consApp > nav .tab.on{
+  #consApp > nav .tab.on,
+  #rmApp > nav .tab.on{
     border-bottom:none;background:#eef0fb;border-left-color:var(--accent);color:var(--ink)
   }
-  #consApp > nav .tab[data-portal]{color:var(--indigo);font-weight:800;margin-bottom:6px}
-  #consApp > nav .spacer{
+  #consApp > nav .tab[data-portal],
+  #rmApp > nav .tab[data-portal]{color:var(--indigo);font-weight:800;margin-bottom:6px}
+  #consApp > nav .spacer,
+  #rmApp > nav .spacer{
     margin-left:0;margin-top:auto;flex-direction:column;align-items:flex-start;
     gap:8px;padding-top:14px;border-top:1px solid var(--line);font-size:12px
   }
-  #consApp > nav .spacer > *{width:100%}
-  #consApp > main{margin-left:212px;max-width:none}
+  #consApp > nav .spacer > *,
+  #rmApp > nav .spacer > *{width:100%}
+  #consApp > main,
+  #rmApp > main{margin-left:212px;max-width:none}
   @media print{
-    #consApp > nav{display:none!important}
-    #consApp > main{margin-left:0!important}
+    #consApp > nav,
+    #rmApp > nav{display:none!important}
+    #consApp > main,
+    #rmApp > main{margin-left:0!important}
   }
   @media(max-width:760px){
-    #consApp > nav{position:static;width:auto;flex-direction:row;flex-wrap:wrap;border-right:none;border-bottom:1px solid var(--line)}
-    #consApp > nav .tab{border-left:none}
-    #consApp > main{margin-left:0}
-    #consApp > nav .spacer{flex-direction:row;margin-top:0;border-top:none}
+    #consApp > nav,
+    #rmApp > nav{position:static;width:auto;flex-direction:row;flex-wrap:wrap;border-right:none;border-bottom:1px solid var(--line)}
+    #consApp > nav .tab,
+    #rmApp > nav .tab{border-left:none}
+    #consApp > main,
+    #rmApp > main{margin-left:0}
+    #consApp > nav .spacer,
+    #rmApp > nav .spacer{flex-direction:row;margin-top:0;border-top:none}
   }
   .page{display:none} .page.on{display:block;animation:fade .25s}
   @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
@@ -444,6 +459,7 @@
 <div id="rmApp" style="display:none">
 <div class="topbar" style="background:linear-gradient(90deg,#5b5bd6,#7b7be0)"></div>
 <nav>
+  <div class="sp-logo-light" style="height:30px;width:104px;margin-right:10px;flex:0 0 auto" title="Shree Pressing"></div>
   <div class="tab" data-portal="1" style="font-weight:800;color:var(--indigo)">⮜ Portal</div>
   <div class="tab on" data-rp="rdash">📈 Dashboard</div>
   <div class="tab" data-rp="ritems">🪨 Materials</div>
