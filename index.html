@@ -87,6 +87,7 @@
   .c.red{background:var(--vlowbg);border-color:#f3c2cd} .c.red .lab,.c.red .note{color:var(--vlow)} .c.red .big{color:var(--vlow)} .c.red .ic{background:var(--vlow);color:#fff}
   .c.amber{background:var(--lowbg);border-color:#efe0b3} .c.amber .lab,.c.amber .note{color:var(--low)} .c.amber .big{color:var(--low)} .c.amber .ic{background:var(--accent);color:#fff}
   .c.indigo{background:#eef0fb;border-color:#d4d8f4} .c.indigo .big{color:var(--indigo)} .c.indigo .ic{background:var(--indigo);color:#fff}
+  .c.steel{background:#eef0f2;border-color:#d3d8de} .c.steel .lab,.c.steel .note{color:#5a6472} .c.steel .big{color:#5a6472} .c.steel .ic{background:#5a6472;color:#fff}
   .cards.two{grid-template-columns:1fr 1fr}
   .banner{padding:14px 18px;border-radius:12px;font-weight:700;color:#fff;background:linear-gradient(90deg,#d6294f,#e0526e);display:flex;align-items:center;gap:10px;margin-bottom:14px}
   .panel{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden;margin-bottom:16px}
@@ -313,7 +314,7 @@
     <p class="sub">Every inward line from the daily GRN import. Filter by status to track Approved, Released, or Rejected receipts.</p>
     <div class="cards" id="grnCards"></div>
     <div class="panel" id="grnRejPanel" style="display:none">
-      <h3 style="color:var(--vlow)">⚠ Rejected GRN lines — needs attention</h3>
+      <h3 style="color:var(--vlow)">⚠ Rejected &amp; Reverted GRN lines — excluded from stock &amp; purchase</h3>
       <div style="overflow:auto;max-height:260px">
         <table id="grnRejTable"><thead><tr><th>GRN No.</th><th>Code</th><th>Item</th><th class="r">Qty</th><th class="r">Value ₹</th><th>Vendor</th><th>Reason</th></tr></thead><tbody></tbody></table>
       </div>
@@ -327,6 +328,7 @@
             <option value="Approved">Approved</option>
             <option value="Released">Released</option>
             <option value="Rejected">Rejected</option>
+            <option value="Reverted">Reverted</option>
           </select>
           <input id="grnSearch" class="search" placeholder="Search item / vendor / GRN…" style="flex:0 0 240px">
         </div>
@@ -1187,20 +1189,24 @@ function renderGrn(){
     return;
   }
   const st=g.by_status||{};
-  const appr=st["Approved"]||0, rel=st["Released"]||0, rej=st["Rejected"]||0;
+  const appr=st["Approved"]||0, rel=st["Released"]||0, rej=st["Rejected"]||0, revt=st["Reverted"]||0;
   document.getElementById("grnCards").innerHTML=[
-    card("Inward This Month","₹"+fmt(Math.round(g.inward_this_month||0)),(g.lines_this_month||0)+" approved lines","indigo","₹"),
+    card("Inward This Month","₹"+fmt(Math.round(g.inward_this_month||0)),(g.lines_this_month||0)+" received lines","indigo","₹"),
     card("Approved",appr+"","lines received OK","green","✓"),
     card("Released",rel+"","awaiting approval","amber","⏳"),
-    card("Rejected",rej+"",rej?"check reasons":"none 🎉",rej?"red":"green","⚠")
+    card("Rejected",rej+"",rej?"check reasons":"none 🎉",rej?"red":"green","⚠"),
+    card("Reverted",revt+"",revt?"receipt undone — not in stock":"none","steel","↩")
   ].join("");
-  const rejRows=g.rejected||[];
-  document.getElementById("grnRejPanel").style.display=rejRows.length?"block":"none";
-  if(rejRows.length){
-    document.querySelector("#grnRejTable tbody").innerHTML=rejRows.map(r=>`<tr>
-      <td class="code">${r.grn||""}</td><td class="code">${r.code||""}</td><td>${r.name||""}</td>
+  const rejRows=g.rejected||[], revRows=g.reverted||[];
+  document.getElementById("grnRejPanel").style.display=(rejRows.length||revRows.length)?"block":"none";
+  if(rejRows.length||revRows.length){
+    const rowHtml=(r,tag,tagColor)=>`<tr>
+      <td class="code">${r.grn||""}</td><td class="code">${r.code||""}</td><td>${r.name||""} ${tag?'<span style="font-size:10px;font-weight:700;color:'+tagColor+'">['+tag+']</span>':''}</td>
       <td class="r">${fmt(r.qty)} ${r.uom||""}</td><td class="r">${inr(r.value)}</td>
-      <td>${r.vendor||""}</td><td>${r.reason||'<span style="color:var(--mut)">—</span>'}</td></tr>`).join("");
+      <td>${r.vendor||""}</td><td>${r.reason||'<span style="color:var(--mut)">—</span>'}</td></tr>`;
+    document.querySelector("#grnRejTable tbody").innerHTML=
+      rejRows.map(r=>rowHtml(r,"REJECTED","#c0264a")).join("")+
+      revRows.map(r=>rowHtml(r,"REVERTED","#5a6472")).join("");
   }
   drawGrnTable();
 }
@@ -1215,7 +1221,7 @@ function drawGrnTable(){
     return true;
   });
   const statusPill=s=>{
-    const m={Approved:["#0f9d58","#D9EAD3"],Rejected:["#c0264a","#F4CCCC"],Released:["#b8860b","#FFF2CC"]};
+    const m={Approved:["#0f9d58","#D9EAD3"],Rejected:["#c0264a","#F4CCCC"],Released:["#b8860b","#FFF2CC"],Reverted:["#5a6472","#E8EAED"]};
     const c=m[s]||["#666","#eee"];
     return `<span class="pill" style="background:${c[1]};color:${c[0]};font-weight:700;font-size:11px">${s||"—"}</span>`;
   };
