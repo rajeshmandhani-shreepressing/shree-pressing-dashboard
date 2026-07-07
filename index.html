@@ -137,6 +137,10 @@
   .mvout{background:var(--vlowbg);color:var(--vlow);font-weight:700;border-radius:4px}
   .mvrow-out td.lbl small{color:var(--vlow)} .mvrow-in td.lbl small{color:var(--ok)}
   @media print{nav,.toolbar,.topbar,footer,.filters{display:none!important}.page{display:block!important}.c,.panel{break-inside:avoid}}
+  .printbar{display:flex;justify-content:flex-end;margin-bottom:10px}
+  .printbar button{background:var(--card);color:var(--indigo);border:1px solid var(--indigo);padding:7px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  .printbar button:hover{background:var(--indigo);color:#fff}
+  @media print{.printbar{display:none!important}}
   @media(max-width:1100px){.cards{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}}
 </style>
 <style id="sp-logo-assets">
@@ -226,6 +230,7 @@
     <span style="font-size:10px;color:var(--mut);background:#eef0fb;padding:2px 8px;border-radius:10px;font-weight:700">BUILD v5 · dynamic</span>
   </div>
   <section class="page on" id="dash">
+    <div class="printbar"><button onclick="printThisCard('dash')">🖶 Print this card</button></div>
     <div class="cards" id="kpiTop"></div>
     <div class="cards two" id="kpiMid"></div>
     <div class="panel" id="finPanel" style="margin-bottom:14px"></div>
@@ -246,6 +251,7 @@
     <div class="panel"><h3>Weekly Consumption Trend — top 6 categories by cost</h3><div class="chartbox"><canvas id="weekChart"></canvas></div></div>
   </section>
   <section class="page" id="items">
+    <div class="printbar"><button onclick="printThisCard('items')">🖶 Print this card</button></div>
     <h1 class="title">Consumables Master</h1>
     <p class="sub" id="itemsSub">items total — filter and search to focus</p>
     <div class="filters">
@@ -262,6 +268,7 @@
   </section>
 
   <section class="page" id="movement">
+    <div class="printbar"><button onclick="printThisCard('movement')">🖶 Print this card</button></div>
     <h1 class="title">Movement — Daily In / Out</h1>
     <p class="sub">Day-by-day receipts (IN) and issues (OUT) per item for the month.</p>
     <div class="filters">
@@ -280,6 +287,7 @@
     <p class="sub" style="margin-top:10px;font-size:12px">Green = received that day · Red = issued that day · blank = no movement.</p>
   </section>
   <section class="page" id="prod">
+    <div class="printbar"><button onclick="printThisCard('prod')">🖶 Print this card</button></div>
     <h1 class="title">Production</h1><p class="sub">Parts produced this month</p>
     <div class="cards two" id="prodKpi"></div>
     <div class="panel"><div style="overflow:auto;max-height:520px">
@@ -287,6 +295,7 @@
     </div></div>
   </section>
   <section class="page" id="bom">
+    <div class="printbar"><button onclick="printThisCard('bom')">🖶 Print this card</button></div>
     <h1 class="title">BOM — Bill of Materials</h1>
     <p class="sub">Search a part to see every consumable it uses, the standard ratio, and live cost.</p>
     <div class="filters">
@@ -302,6 +311,7 @@
   </section>
 
   <section class="page" id="mfg">
+    <div class="printbar"><button onclick="printThisCard('mfg')">🖶 Print this card</button></div>
     <h1 class="title">Cost per Piece — every part</h1>
     <p class="sub">Consumable cost to make one piece of each part, straight from BOM ratios × purchase rate. Click any part for a printable cost card.</p>
     <div class="cards" id="mfgCards"></div>
@@ -325,6 +335,7 @@
   </section>
 
   <section class="page" id="grn">
+    <div class="printbar"><button onclick="printThisCard('grn')">🖶 Print this card</button></div>
     <h1 class="title">GRN Inward — material receipts & status</h1>
     <p class="sub">Every inward line from the daily GRN import. Filter by status to track Approved, Released, or Rejected receipts.</p>
     <div class="cards" id="grnCards"></div>
@@ -378,6 +389,7 @@
   </section>
 
   <section class="page" id="analytics">
+    <div class="printbar"><button onclick="printThisCard('analytics')">🖶 Print this card</button></div>
     <h1 class="title">Analytics — Cost & Consumption</h1>
     <p class="sub">Where the money goes, and where to cut. A/B/C = high/medium/low value items.</p>
     <div class="filters" style="align-items:center">
@@ -453,6 +465,7 @@
   </section>
 
   <section class="page" id="trends">
+    <div class="printbar"><button onclick="printThisCard('trends')">🖶 Print this card</button></div>
     <h1 class="title">Trends — Month over Month</h1>
     <p class="sub">Proof of cost-cutting over time. Each month-end, a snapshot is saved and compared here.</p>
     <div class="cards" id="trendCards"></div>
@@ -460,6 +473,7 @@
   </section>
 
   <section class="page" id="alerts">
+    <div class="printbar"><button onclick="printThisCard('alerts')">🖶 Print this card</button></div>
     <h1 class="title">Alerts</h1>
     <p class="sub" id="alertsSub">All active alerts, most urgent first.</p>
     <div class="filters">
@@ -472,6 +486,7 @@
   </section>
 
   <section class="page" id="reports">
+    <div class="printbar"><button onclick="printThisCard('reports')">🖶 Print this card</button></div>
     <h1 class="title">Reports</h1>
     <p class="sub">Generate, then use "Print / Save PDF" to keep a copy.</p>
     <div class="toolbar">
@@ -1479,6 +1494,108 @@ function printCostCard(){
     @media print{@page{margin:14mm}}</style></head><body>${card.outerHTML}</body></html>`);
   w.document.close(); w.focus();
   setTimeout(()=>{ w.print(); w.close(); },300);
+}
+
+/* ============================================================
+ * ★ GENERIC "PRINT THIS CARD" — self-contained popup per tab.
+ *   Clones the active tab, turns charts into images, strips
+ *   interactive controls, and opens a clean A4 report window
+ *   (same pattern as the Lucy Cell FMS report printer).
+ * ============================================================ */
+const PRINT_TITLES = {
+  dash:"Dashboard — Stock & Money Overview",
+  items:"Consumables Master — Item List",
+  movement:"Stock Movement",
+  prod:"Production",
+  bom:"Bill of Materials",
+  mfg:"Cost per Part",
+  grn:"GRN Inward — Receipts & Verification",
+  analytics:"Analytics — Pareto, ABC & Slow Movers",
+  trends:"Month-over-Month Trends",
+  alerts:"Alerts",
+  reports:"Reports"
+};
+function printThisCard(sectionId){
+  const src=document.getElementById(sectionId);
+  if(!src){ alert("Nothing to print on this tab yet."); return; }
+
+  // 1. Snapshot every chart canvas to a PNG BEFORE cloning (clones lose canvas pixels)
+  const chartImgs=[];
+  src.querySelectorAll("canvas").forEach(cv=>{
+    try{ chartImgs.push(cv.toDataURL("image/png")); }catch(e){ chartImgs.push(null); }
+  });
+
+  // 2. Deep-clone the section so we never disturb the live page
+  const clone=src.cloneNode(true);
+
+  // 3. Replace each cloned canvas with its PNG image
+  const clonedCanvases=clone.querySelectorAll("canvas");
+  clonedCanvases.forEach((cv,i)=>{
+    if(chartImgs[i]){
+      const img=document.createElement("img");
+      img.src=chartImgs[i];
+      img.style.cssText="width:100%;max-width:760px;height:auto;display:block;margin:6px auto";
+      cv.parentNode.replaceChild(img,cv);
+    } else { cv.remove(); }
+  });
+
+  // 4. Strip interactive-only controls that make no sense on paper
+  clone.querySelectorAll(
+    ".filters, .search, input, select, .toggle, .seg, button, .chip, .navbadge, .no-print, .noprint, .toolbar"
+  ).forEach(el=>el.remove());
+
+  // 5. Un-cap any scroll boxes so the full table prints, not just the visible slice
+  clone.querySelectorAll("[style*='max-height'], [style*='overflow']").forEach(el=>{
+    el.style.maxHeight="none"; el.style.overflow="visible";
+  });
+
+  const period=(RAW && RAW.period && RAW.period.label) ? RAW.period.label : "This month";
+  const title=PRINT_TITLES[sectionId]||"Report";
+  const gen=new Date().toLocaleString("en-IN");
+
+  const html=`<!doctype html><html><head><meta charset="utf-8">
+  <title>Shree Pressing — ${title}</title>
+  <style>
+    *{box-sizing:border-box}
+    body{font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif;color:#1a1f29;margin:24px;font-size:13px}
+    .band{background:#1F4E78;color:#fff;padding:16px 22px;border-radius:10px;margin-bottom:18px}
+    .band h1{margin:0;font-size:19px;font-weight:800}
+    .band p{margin:4px 0 0;color:#bcd3ea;font-size:12px}
+    h1.title,.title{font-size:17px;font-weight:800;margin:0 0 4px}
+    .sub{color:#7b8494;font-size:12px;margin:0 0 12px}
+    h3{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:#5b6b80;margin:18px 0 8px;border-bottom:2px solid #1F4E78;padding-bottom:5px}
+    .panel{border:1px solid #e0e5ec;border-radius:10px;padding:14px 16px;margin-bottom:14px}
+    .cards,.cards.two,.grid2{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+    .cards.two{grid-template-columns:repeat(2,1fr)}
+    .grid2{grid-template-columns:1fr 1fr}
+    .c{border:1px solid #e0e5ec;border-radius:9px;padding:12px 14px}
+    .c .lab{font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#8a98ab;font-weight:700}
+    .c .big{font-size:22px;font-weight:800;margin-top:5px}
+    .c .note{font-size:11px;color:#8a98ab;margin-top:3px}
+    .c .ic{display:none}
+    table{border-collapse:collapse;width:100%;font-size:12px;margin-bottom:8px}
+    th,td{border:1px solid #dde2e9;padding:6px 8px;text-align:left}
+    th{background:#1F4E78;color:#fff;font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:.3px}
+    td.r,th.r{text-align:right}
+    tr:nth-child(even) td{background:#f6f8fa}
+    .pill{padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700}
+    .banner,.bannerstack{border:1px solid #e0e5ec;border-radius:9px;padding:10px 14px;margin-bottom:10px;font-size:12px}
+    img{page-break-inside:avoid}
+    .panel,.c,table{page-break-inside:avoid}
+    .print-btn{position:fixed;top:14px;right:14px;background:#1F4E78;color:#fff;border:none;padding:10px 16px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px}
+    @media print{.print-btn{display:none}@page{margin:14mm}}
+  </style></head><body>
+  <button class="print-btn" onclick="window.print()">🖶 Print / Save PDF</button>
+  <div class="band">
+    <h1>Shree Pressing — ${title}</h1>
+    <p>Period: <b style="color:#fff">${period}</b> &nbsp;·&nbsp; Generated ${gen}</p>
+  </div>
+  ${clone.innerHTML}
+  </body></html>`;
+
+  const w=window.open("","_blank");
+  if(!w){ alert("Allow pop-ups to print this card."); return; }
+  w.document.write(html); w.document.close();
 }
 function renderProd(){const k=RAW.kpi;
   document.getElementById("prodKpi").innerHTML=[card("Total Produced",(k.total_produced||0).toLocaleString("en-IN")+" pcs","","indigo","🏭"),card("Total Dispatched",(k.total_dispatched||0).toLocaleString("en-IN")+" pcs","","indigo","📦")].join("");
